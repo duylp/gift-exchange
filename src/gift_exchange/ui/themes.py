@@ -19,7 +19,7 @@ class Theme:
         colors: Quasar colours for `ui.colors` (buttons, inputs, toggles); empty = defaults.
         header: Text of the link home at the top of the page.
         background: CSS `background` for the page body, or None for the default.
-        title_font: Google Fonts family for headings (class `theme-title`), or None.
+        title_font: Google Fonts family for the event title (class `theme-title`), or None.
         body_font: Google Fonts family for all other text, or None for the default.
         card: Put the page content on a white rounded card (readable over a background).
         stripe: Candy-cane stripe under the header.

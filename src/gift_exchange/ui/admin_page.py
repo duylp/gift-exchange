@@ -53,7 +53,7 @@ def admin_home(request: Request) -> RedirectResponse | None:
 
     ui.page_title("Admin")
     with page_frame("max-w-xl"):
-        ui.label("Your events").classes("theme-title text-2xl font-bold")
+        ui.label("Your events").classes("text-2xl font-bold")
         if not events:
             ui.label("No events yet. Create one below.").classes("text-gray-600")
         for event in events:
@@ -73,7 +73,7 @@ def admin_home(request: Request) -> RedirectResponse | None:
 
 
 def _new_event_form() -> None:
-    ui.label("New event").classes("theme-title text-lg font-semibold")
+    ui.label("New event").classes("text-lg font-semibold")
     base = get_settings().base_url
     slug = (
         ui.input(
@@ -159,7 +159,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
     with page_frame("max-w-xl"):
         ui.link("← All events", "/admin").classes("text-sm")
         with ui.row().classes("w-full items-center justify-between"):
-            ui.label(event.title).classes("theme-title text-2xl font-bold")
+            ui.label(event.title).classes("text-2xl font-bold")
             _status_badge(event)
         _share_link(event)
 
@@ -549,7 +549,7 @@ async def _confirm(message: str, ok_label: str) -> bool:
 
 def _section(title: str) -> None:
     ui.separator()
-    ui.label(title).classes("theme-title text-lg font-semibold")
+    ui.label(title).classes("text-lg font-semibold")
 
 
 def _banner(text: str, bg: str) -> None:

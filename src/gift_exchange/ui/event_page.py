@@ -38,7 +38,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
         except db.NotFound:
             ui.status_code(404)
             with page_frame():
-                ui.label("No such event 🤔").classes("theme-title text-xl font-semibold")
+                ui.label("No such event 🤔").classes("text-xl font-semibold")
                 ui.label("Check the link you were sent.")
             return
         count = db.count_participants(conn, event.id)
@@ -76,7 +76,7 @@ def _welcome(event: db.Event) -> None:
 def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None:
     editing = me is not None
     ui.label("Edit your answers" if editing else "Join the gift exchange").classes(
-        "theme-title text-lg font-semibold"
+        "text-lg font-semibold"
     )
     required = {"Required": lambda v: bool(v and v.strip())}
 
@@ -141,7 +141,7 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
 
 
 def _joined(event: db.Event, me: db.Participant) -> None:
-    ui.label("You're in! 🎉").classes("theme-title text-lg font-semibold")
+    ui.label("You're in! 🎉").classes("text-lg font-semibold")
     ui.label("The draw happens soon. You can edit your answers until then.")
     with ui.card().classes("w-full").props("flat bordered"):
         _qa("Nickname", me.nickname)
@@ -156,9 +156,7 @@ def _joined(event: db.Event, me: db.Participant) -> None:
 
 def _giftee(event: db.Event, giftee: db.Giftee) -> None:
     ui.label("You're Santa for…").classes("text-lg")
-    ui.label(f"🎁 {giftee.nickname} 🎁").classes(
-        "theme-title text-3xl font-bold text-center w-full my-2"
-    )
+    ui.label(f"🎁 {giftee.nickname} 🎁").classes("text-3xl font-bold text-center w-full my-2")
     ui.label(f"Budget: S${giftee.budget}").classes("font-semibold")
     ui.label("What they told us:").classes("mt-2")
     with ui.card().classes("w-full").props("flat bordered"):
@@ -210,7 +208,7 @@ def _how_it_works(event: db.Event) -> None:
         steps.append(
             "Answers marked 🤫 aren't shown to your Santa; they're saved for the party reveal."
         )
-    ui.label("How it works").classes("theme-title text-lg font-semibold")
+    ui.label("How it works").classes("font-semibold")
     ui.markdown("\n".join(f"{i}. {step}" for i, step in enumerate(steps, 1))).classes("-mt-4")
 
 
