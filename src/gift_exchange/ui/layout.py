@@ -126,8 +126,13 @@ def _add_fonts(look: Theme) -> None:
     """Load the theme's Google Fonts (one request) and apply them."""
     families = []
     if look.body_font:
-        families.append(f"family={look.body_font.replace(' ', '+')}:wght@400;600;700")
-        ui.add_css(f"body {{ font-family: '{look.body_font}', sans-serif; }}")
+        # Regular text at 500: many rounded fonts (e.g. Nunito) look thin at 400. Semi-bold
+        # headings then move up to 700 so they still stand out from it.
+        families.append(f"family={look.body_font.replace(' ', '+')}:wght@500;700;800")
+        ui.add_css(
+            f"body {{ font-family: '{look.body_font}', sans-serif; font-weight: 500; }}\n"
+            ".font-semibold { font-weight: 700; }"
+        )
     if look.title_font:
         families.append(f"family={look.title_font.replace(' ', '+')}:wght@700")
         ui.add_css(f".theme-title {{ font-family: '{look.title_font}', cursive; }}")
