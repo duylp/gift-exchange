@@ -8,7 +8,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 
 ## Decisions so far
 - **Stack:** NiceGUI (pin exact version) + SQLite via stdlib `sqlite3` + magic-link login (itsdangerous) + Resend for email. Python 3.12, managed with uv.
-- **NiceGUI caution:** its API changes between major versions — check the pinned version's docs/examples before writing UI code. Keep core logic (matching, DB, auth) in plain Python, separate from the UI layer. Keep all state in the DB, not in UI elements (phones drop WebSocket connections).
+- **NiceGUI caution:** its API changes between major versions — check the official docs (https://nicegui.io/documentation) for the pinned version before writing UI code. Keep core logic (matching, DB, auth) in plain Python, separate from the UI layer. Keep all state in the DB, not in UI elements (phones drop WebSocket connections).
 - **Hosting:** DigitalOcean 1 GB Droplet in SGP1, Docker Compose + Caddy for HTTPS. For now, build the image on the Droplet (`docker compose up --build`); no CI pipeline yet. Deferred: GitHub Actions → GHCR, and arm64 images (only when a Raspberry Pi is actually used).
 - **Domain:** `duylp.dev` (to be registered); app at `santa.duylp.dev`, events at `/e/<slug>` (e.g. `xmas-2026`). Resend sending domain `mail.duylp.dev`.
 - **DNS / registrar:** Cloudflare (registrar + DNS). App record is DNS-only (proxy off) so Caddy terminates TLS.
@@ -16,8 +16,12 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
 - **Migrations:** own minimal engine `sqlite_migrate` — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. App usage: `docs/migrations.md`; engine design: `src/sqlite_migrate/README.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
-- **Auth:** magic link (itsdangerous) → signed session cookie valid for 30 days. A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding the person's email; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
-- **Email:** `httpx` POST to the Resend API (no SDK). Dev backend prints the link to the console.
+- **Auth:** magic link (itsdangerous, not JWT — same app signs and checks) → own signed session cookie, nothing stored server-side. Chosen over NiceGUI's documented `app.storage.user` (server-side files in `.nicegui/`: needs a volume, piles up, outside the DB).
+  - Login link: email signed with `SECRET_KEY`, valid 15 minutes, reusable within that window (mail scanners pre-open links). One email per address per minute (in-memory cooldown).
+  - `/login?next=…` (email form) → email → `/auth?token=…&next=…` sets cookie `session` (signed email, 30 days, HttpOnly, Secure on https, SameSite=Lax) → redirect to `next` (same-site paths only). `/logout` clears it. Errors shown via fixed codes (`?error=expired|invalid`), never free text from the URL.
+  - Pages take `request: Request` and call `ui/session.py:current_email(request)` while building; per-page checks (not middleware) because event pages are partly public. Admin = email in `ADMIN_EMAILS`. Rotating `SECRET_KEY` logs everyone out.
+  - Do not use NiceGUI `app.storage.user`.
+- **Email:** `httpx` POST to the Resend API (no SDK); must send a `User-Agent` header (Resend returns 403 without one). Dev backend (`DEV=1`) prints emails, including login links, to the terminal.
 - **Multi-event:** the app is occasion-agnostic; an event has just a slug, title and budget (no themes/branding in v1).
 
 ## v1 scope
@@ -39,7 +43,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, themes, R2 backups, CI/GHCR + arm64 images
 
 ## Code conventions
-- **Layout:** `src/gift_exchange/` package with `core/` (plain Python) and `ui/` (NiceGUI pages only). Each core component is a subpackage with one module per area, re-exporting its public API from `__init__.py` (callers use `from gift_exchange.core import db` → `db.join_event(...)`): `core/matching/`, `core/db/` (schema SQL in `core/db/migrations/`, shipped with the package); later `core/auth/`, `core/email/`. Tests mirror it under `tests/core/<component>/` (test file names must be unique across the tree).
+- **Layout:** `src/gift_exchange/` package with `core/` (plain Python) and `ui/` (NiceGUI pages only). Each core component is a subpackage with one module per area, re-exporting its public API from `__init__.py` (callers use `from gift_exchange.core import db` → `db.join_event(...)`): `core/matching/`, `core/db/` (schema SQL in `core/db/migrations/`, shipped with the package), `core/auth/`, `core/email/`. Tests mirror it under `tests/core/<component>/` (test file names must be unique across the tree).
 - **`src/sqlite_migrate/`** is a standalone package meant to become its own repo later: it must never import `gift_exchange` (a test enforces this), and its tests live in `tests/sqlite_migrate/`.
 - **DB access:** stdlib `sqlite3`; all queries in the `core/db/` package, returning dataclasses. UI never writes SQL. Expected failures raise `DbError` subclasses (`NicknameTaken`, `EventClosed`, …) whose messages are safe to show users.
 - **Types:** type hints everywhere; no type checker in v1.

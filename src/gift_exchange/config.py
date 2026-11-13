@@ -1,5 +1,6 @@
 """Deployment settings, read from environment variables (and `.env` in development)."""
 
+import functools
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,3 +45,9 @@ def load_settings() -> Settings:
         host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", "8080")),
     )
+
+
+@functools.cache
+def get_settings() -> Settings:
+    """The app's settings, loaded once per process (use this from UI code)."""
+    return load_settings()
