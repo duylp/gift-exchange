@@ -294,3 +294,7 @@ def test_list_events_joined_by(conn: sqlite3.Connection, event: q.Event) -> None
     ]
     assert [e.slug for e in q.list_events_joined_by(conn, "bob@example.com")] == ["xmas-2026"]
     assert q.list_events_joined_by(conn, "nobody@example.com") == []
+
+
+def test_get_event_by_slug_ignores_case(conn: sqlite3.Connection, event: q.Event) -> None:
+    assert q.get_event_by_slug(conn, " Xmas-2026 ").id == event.id

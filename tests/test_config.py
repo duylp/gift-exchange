@@ -23,8 +23,36 @@ def test_email_from_required_outside_dev(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("SECRET_KEY", "x")
     monkeypatch.setenv("DEV", "0")
     monkeypatch.setenv("RESEND_API_KEY", "re_x")
+    monkeypatch.setenv("BASE_URL", "https://santa.example")
     monkeypatch.delenv("EMAIL_FROM", raising=False)
     with pytest.raises(RuntimeError, match="EMAIL_FROM"):
         load_settings()
     monkeypatch.setenv("EMAIL_FROM", "Santa <santa@mail.example.com>")
     assert load_settings().email_from == "Santa <santa@mail.example.com>"
+
+
+@pytest.mark.parametrize("base_url", [None, "", "http://santa.example"])
+def test_https_base_url_required_outside_dev(
+    monkeypatch: pytest.MonkeyPatch, base_url: str | None
+) -> None:
+    monkeypatch.setattr("gift_exchange.config.load_dotenv", lambda: None)
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("DEV", "0")
+    monkeypatch.setenv("RESEND_API_KEY", "re_x")
+    monkeypatch.setenv("EMAIL_FROM", "s@x")
+    if base_url is None:
+        monkeypatch.delenv("BASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("BASE_URL", base_url)
+    with pytest.raises(RuntimeError, match="BASE_URL"):
+        load_settings()
+    monkeypatch.setenv("BASE_URL", "https://santa.example/")
+    assert load_settings().base_url == "https://santa.example"
+
+
+def test_dev_defaults_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("gift_exchange.config.load_dotenv", lambda: None)
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("DEV", "1")
+    monkeypatch.delenv("BASE_URL", raising=False)
+    assert load_settings().base_url == "http://localhost:8080"

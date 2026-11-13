@@ -78,3 +78,8 @@ def test_resend_network_error_raises() -> None:
 def test_make_sender() -> None:
     assert isinstance(make_sender(True, "", ""), ConsoleSender)
     assert isinstance(make_sender(False, "re_key", "s@x"), ResendSender)
+
+
+def test_resend_success_with_non_json_reply_is_fine() -> None:
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, text="OK"))
+    asyncio.run(ResendSender("k", "s@x", transport=transport).send(login_email("a@x.com", LINK)))

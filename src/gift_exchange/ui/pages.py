@@ -5,13 +5,18 @@ from nicegui import ui
 
 from gift_exchange.core import db
 from gift_exchange.ui.dbconn import open_db
-from gift_exchange.ui.layout import page_frame
+from gift_exchange.ui.layout import account_footer, page_frame
 from gift_exchange.ui.login import login_form
 from gift_exchange.ui.session import current_admin, current_email
 
 
 @ui.page("/")
 def index(request: Request) -> None:
+    """Home page: your exchanges when logged in, otherwise a welcome and the login form.
+
+    Args:
+        request: The incoming request (injected by NiceGUI), for the session cookie.
+    """
     email = current_email(request)
     ui.page_title("Gift exchange")
     with page_frame():
@@ -45,7 +50,4 @@ def index(request: Request) -> None:
                 "outline"
             ).classes("w-full")
 
-        ui.separator().classes("mt-4")
-        with ui.row().classes("w-full justify-between text-sm text-gray-500"):
-            ui.label(f"Logged in as {email}")
-            ui.link("Log out", "/logout")
+        account_footer(email)

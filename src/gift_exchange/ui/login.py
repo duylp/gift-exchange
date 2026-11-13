@@ -68,7 +68,16 @@ def logout() -> RedirectResponse:
 
 @ui.page("/login")
 def login_page(request: Request, next: str = "/", error: str = "") -> RedirectResponse | None:
-    """Email form that sends a magic link. Already logged in → go straight to `next`."""
+    """The /login page: email form that sends a magic link.
+
+    Args:
+        request: The incoming request (injected by NiceGUI), for the session cookie.
+        next: Where to go after logging in (same-site paths only).
+        error: "expired" or "invalid" when sent here by a bad /auth link.
+
+    Returns:
+        A redirect to `next` if already logged in, otherwise None (render the form).
+    """
     target = safe_next(next)
     if current_email(request):
         return RedirectResponse(target, 303)
@@ -108,15 +117,18 @@ def login_form(next_path: str) -> None:
         settings = get_settings()
         token = make_login_token(settings.secret_key, email)
         link = f"{settings.base_url}/auth?" + urlencode({"token": token, "next": target})
+        button.disable()
         button.props("loading")
         try:
             await _sender().send(login_email(email, link))
         except EmailError:
             log.exception("Login email to %s failed", email)
+            _cooldown.forget(email)  # nothing was sent, so let them retry right away
             ui.notify("Sorry, we couldn't send the email. Try again later.", type="negative")
             return
         finally:
             button.props(remove="loading")
+            button.enable()
         form.set_visibility(False)
         with sent:
             sent.clear()

@@ -17,3 +17,11 @@ def page_frame(max_width: str = "max-w-md") -> ui.column:
             "text-sm font-semibold text-gray-600 no-underline hover:underline"
         )
     return frame
+
+
+def account_footer(email: str) -> None:
+    """The "Logged in as … · Log out" line at the bottom of a page."""
+    ui.separator().classes("mt-4")
+    with ui.row().classes("w-full justify-between text-sm text-gray-500"):
+        ui.label(f"Logged in as {email}")
+        ui.link("Log out", "/logout")

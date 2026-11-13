@@ -14,7 +14,7 @@ from nicegui import ui
 
 from gift_exchange.core import db
 from gift_exchange.ui.dbconn import open_db
-from gift_exchange.ui.layout import page_frame
+from gift_exchange.ui.layout import account_footer, page_frame
 from gift_exchange.ui.login import login_form
 from gift_exchange.ui.session import current_email
 
@@ -24,6 +24,13 @@ MAX_ANSWER = 500
 
 @ui.page("/e/{slug}")
 def event_page(slug: str, request: Request, edit: bool = False) -> None:
+    """One event's page; what it shows depends on the viewer (see the module docstring).
+
+    Args:
+        slug: The event's URL slug (case is ignored).
+        request: The incoming request (injected by NiceGUI), for the session cookie.
+        edit: `?edit=true` reopens the sign-up form for someone who has already joined.
+    """
     email = current_email(request)
     with open_db() as conn:
         try:
@@ -51,7 +58,8 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
             _giftee(event, giftee)
         else:
             _closed()
-        _footer(email, event.slug)
+        if email:
+            account_footer(email)
 
 
 # --- states ------------------------------------------------------------------------------
@@ -169,14 +177,6 @@ def _header(event: db.Event, count: int) -> None:
         joined = f"{count} taking part"
     ui.label(f"Budget: S${event.budget} · {joined}").classes("text-gray-600 -mt-3")
     ui.separator()
-
-
-def _footer(email: str | None, slug: str) -> None:
-    if email:
-        ui.separator().classes("mt-4")
-        with ui.row().classes("w-full justify-between text-sm text-gray-500"):
-            ui.label(f"Logged in as {email}")
-            ui.link("Log out", "/logout")
 
 
 def _qa(question: str, answer: str) -> None:

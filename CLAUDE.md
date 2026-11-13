@@ -13,7 +13,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Domain:** `duylp.dev` (to be registered); app at `santa.duylp.dev`, events at `/e/<slug>` (e.g. `xmas-2026`). Resend sending domain `mail.duylp.dev`.
 - **DNS / registrar:** Cloudflare (registrar + DNS). App record is DNS-only (proxy off) so Caddy terminates TLS.
 - **Repo:** public on GitHub. Secrets never committed.
-- **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
+- **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Outside `DEV=1`, `RESEND_API_KEY`, `EMAIL_FROM` and an `https://` `BASE_URL` are required (startup fails otherwise). Everything about an event lives in the DB and is managed via the admin page.
 - **Migrations:** own minimal engine `sqlite_migrate` — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. App usage: `docs/migrations.md`; engine design: `src/sqlite_migrate/README.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
 - **Auth:** magic link (itsdangerous, not JWT — same app signs and checks) → own signed session cookie, nothing stored server-side. Chosen over NiceGUI's documented `app.storage.user` (server-side files in `.nicegui/`: needs a volume, piles up, outside the DB).

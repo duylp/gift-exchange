@@ -14,20 +14,18 @@ from nicegui import ui
 
 from gift_exchange.config import get_settings
 from gift_exchange.core import db
-from gift_exchange.core.auth import is_admin
 from gift_exchange.core.matching import MatchingError, Verdict
 from gift_exchange.ui.dbconn import open_db
 from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.login import login_url
-from gift_exchange.ui.session import current_email
+from gift_exchange.ui.session import current_admin, current_email
 
 
 def _guard(request: Request) -> RedirectResponse | None:
     """Redirect away unless the visitor is a logged-in organiser."""
-    email = current_email(request)
-    if email is None:
+    if current_email(request) is None:
         return RedirectResponse(login_url(request.url.path), 303)
-    if not is_admin(email, get_settings().admin_emails):
+    if not current_admin(request):
         return RedirectResponse("/", 303)
     return None
 
@@ -37,6 +35,14 @@ def _guard(request: Request) -> RedirectResponse | None:
 
 @ui.page("/admin")
 def admin_home(request: Request) -> RedirectResponse | None:
+    """The /admin page: all events and a form to create one. Organisers only.
+
+    Args:
+        request: The incoming request (injected by NiceGUI), for the session cookie.
+
+    Returns:
+        A redirect if the visitor isn't a logged-in organiser, otherwise None.
+    """
     if redirect := _guard(request):
         return redirect
     with open_db() as conn:
@@ -122,6 +128,15 @@ def _new_event_form() -> None:
 
 @ui.page("/admin/e/{slug}")
 def admin_event(slug: str, request: Request) -> RedirectResponse | None:
+    """The /admin/e/<slug> page: manage one event. Organisers only.
+
+    Args:
+        slug: The event's URL slug (case is ignored).
+        request: The incoming request (injected by NiceGUI), for the session cookie.
+
+    Returns:
+        A redirect if the visitor isn't a logged-in organiser, otherwise None.
+    """
     if redirect := _guard(request):
         return redirect
     with open_db() as conn:
@@ -162,7 +177,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
         _feasibility_banner(feasibility, len(people), names, event)
 
         _section("Draw")
-        _draw(event, len(people), len(exclusions), names, reload)
+        _draw(event, len(people), len(exclusions), feasibility, names, reload)
 
         if event.is_open:
             _section("Danger zone")
@@ -211,8 +226,8 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
             return
+        # No reload: the fields already show what was saved, and a reload would hide this.
         ui.notify("Saved", type="positive")
-        reload()
 
     ui.button("Save settings", on_click=save).props("outline")
 
@@ -311,7 +326,14 @@ def _feasibility_banner(feasibility, count: int, names: dict[int, str], event: d
         )
 
 
-def _draw(event: db.Event, people: int, exclusions: int, names: dict[int, str], reload) -> None:
+def _draw(
+    event: db.Event,
+    people: int,
+    exclusions: int,
+    feasibility,
+    names: dict[int, str],
+    reload,
+) -> None:
     if not event.is_open:
         when = (event.matched_at or "")[:10]
         ui.label(f"✓ Matched on {when}. Everyone can see their giftee at the event link.")
@@ -328,18 +350,23 @@ def _draw(event: db.Event, people: int, exclusions: int, names: dict[int, str], 
             return
         try:
             with open_db() as conn:
-                matched = db.run_matching(conn, event.id, random.SystemRandom())
+                db.run_matching(conn, event.id, random.SystemRandom())
         except MatchingError as exc:
-            who = ", ".join(names.get(i, "?") for i in exc.people)
-            ui.notify(f"{exc} {who}", type="negative", multi_line=True, timeout=0)
+            # Name people only when they're the cause, not for "need at least 3 people".
+            who = ", ".join(names.get(i, "?") for i in exc.people) if people >= 3 else ""
+            ui.notify(f"{exc} {who}".strip(), type="negative", multi_line=True, timeout=0)
             return
         except db.DbError as exc:
             ui.notify(str(exc), type="negative")
             return
-        ui.notify(f"Matched {matched} people 🎉", type="positive")
+        # The reloaded page shows "✓ Matched on …" (a toast here would vanish on reload).
         reload()
 
-    ui.button("Run matching", on_click=run).props("color=positive").classes("w-full")
+    can_run = people >= 3 and feasibility.verdict is not Verdict.IMPOSSIBLE
+    button = ui.button("Run matching", on_click=run).props("color=positive").classes("w-full")
+    if not can_run:
+        button.disable()
+        ui.label("Fix the problem above to enable the draw.").classes("text-xs text-gray-500 -mt-2")
 
 
 def _delete_button(event: db.Event) -> None:

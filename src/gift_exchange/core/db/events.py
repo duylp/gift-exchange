@@ -56,12 +56,14 @@ def get_event(conn: sqlite3.Connection, event_id: int) -> Event:
 
 
 def get_event_by_slug(conn: sqlite3.Connection, slug: str) -> Event:
-    """Look up an event by its URL slug.
+    """Look up an event by its URL slug, ignoring case and surrounding spaces.
+
+    Slugs are stored lowercase, so a link a phone auto-capitalised (/e/Xmas-2026) works.
 
     Raises:
         NotFound: If there is no such event.
     """
-    row = conn.execute("SELECT * FROM events WHERE slug = ?", (slug,)).fetchone()
+    row = conn.execute("SELECT * FROM events WHERE slug = ?", (slug.strip().lower(),)).fetchone()
     if row is None:
         raise NotFound("No such event.")
     return event_from_row(row)

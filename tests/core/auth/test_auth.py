@@ -124,3 +124,11 @@ def test_cooldown() -> None:
     assert not cd.allow("a")
     now[0] = 60
     assert cd.allow("a")
+
+
+def test_cooldown_forget_allows_retry() -> None:
+    cd = Cooldown(60, clock=lambda: 0.0)
+    assert cd.allow("a")
+    cd.forget("a")
+    assert cd.allow("a")
+    cd.forget("never-seen")  # no error

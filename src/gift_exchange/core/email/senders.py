@@ -93,7 +93,11 @@ class ResendSender:
             raise EmailError(f"Could not reach Resend: {exc}") from exc
         if response.is_error:
             raise EmailError(f"Resend returned {response.status_code}: {response.text[:300]}")
-        log.info("Sent email %r via Resend (id %s)", email.subject, response.json().get("id"))
+        try:
+            email_id = response.json().get("id")
+        except ValueError:  # sent fine, but the reply wasn't JSON; nothing to act on
+            email_id = None
+        log.info("Sent email %r via Resend (id %s)", email.subject, email_id)
 
 
 def make_sender(dev: bool, resend_api_key: str, email_from: str) -> EmailSender:

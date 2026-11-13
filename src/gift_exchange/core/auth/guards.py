@@ -53,6 +53,10 @@ class Cooldown:
         if last is not None and now - last < self._seconds:
             return False
         self._last[key] = now
-        if len(self._last) > 1000:  # forget stale entries so this can't grow forever
+        if len(self._last) > 1000:  # drop stale entries so this can't grow forever
             self._last = {k: t for k, t in self._last.items() if now - t < self._seconds}
         return True
+
+    def forget(self, key: str) -> None:
+        """Undo the last allowed attempt for `key` (e.g. the email failed to send)."""
+        self._last.pop(key, None)
