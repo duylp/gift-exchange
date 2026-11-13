@@ -381,7 +381,9 @@ def _draw(
 def _delete_button(event: db.Event) -> None:
     async def delete() -> None:
         if not await _confirm(
-            f"Delete “{event.title}” with all its sign-ups and exclusions?", "Delete"
+            f"Delete “{event.title}”? Its page and sign-ups disappear from the app "
+            "(they're kept in the database and can be restored there).",
+            "Delete",
         ):
             return
         try:

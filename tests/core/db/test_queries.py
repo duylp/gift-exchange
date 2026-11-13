@@ -313,16 +313,34 @@ def test_budget_fixed_after_match_but_title_editable(
     assert (kept.title, kept.sections) == ("Again", event.sections)
 
 
-def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
+def test_delete_event_is_soft(conn: sqlite3.Connection, event: q.Event) -> None:
     a, b, _ = (signup(conn, event, n) for n in ("ann", "bob", "cat"))
     q.add_exclusion(conn, event.id, a.id, b.id)
     other = q.create_event(conn, "other", "Other", 10, [q.Section("", ("a?", "b?"))])
     signup(conn, other, "ann")  # same person in another event
     q.delete_event(conn, event.id)
+    # Gone from the app ...
     with pytest.raises(q.NotFound):
         q.get_event(conn, event.id)
-    assert len(q.list_participants(conn, other.id)) == 1  # other events untouched
-    q.delete_event(conn, event.id)  # missing: no-op
+    with pytest.raises(q.NotFound):
+        q.get_event_by_slug(conn, event.slug)
+    with pytest.raises(q.NotFound):
+        q.update_event(conn, event.id, "T", 30, None)
+    with pytest.raises(q.NotFound):
+        q.join_event(conn, event.id, "dan@example.com", "Dan", "dan", ["a", "b"])
+    with pytest.raises(q.NotFound):
+        q.run_matching(conn, event.id)
+    assert q.list_events(conn) == [other]
+    assert q.list_events_joined_by(conn, "ann@example.com") == [other]
+    # ... but nothing is erased, and setting deleted_at back to NULL restores it.
+    assert len(q.list_participants(conn, event.id)) == 3
+    assert len(q.list_exclusions(conn, event.id)) == 1
+    with pytest.raises(q.SlugTaken, match="deleted"):
+        q.create_event(conn, event.slug, "Again", 30, [])
+    q.delete_event(conn, event.id)  # already deleted: no-op
+    q.delete_event(conn, 999)  # missing: no-op
+    conn.execute("UPDATE events SET deleted_at = NULL WHERE id = ?", (event.id,))
+    assert q.get_event(conn, event.id) == event
 
 
 def test_matched_event_cannot_be_deleted(conn: sqlite3.Connection, event: q.Event) -> None:

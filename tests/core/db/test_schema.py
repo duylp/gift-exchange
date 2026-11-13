@@ -167,3 +167,17 @@ def test_budget_fixed_after_match(db: sqlite3.Connection) -> None:
     db.execute(
         "UPDATE events SET budget = 40, title = 'New' WHERE id = ?", (event,)
     )  # unchanged ok
+
+
+def test_matched_event_cannot_be_soft_deleted(db: sqlite3.Connection) -> None:
+    event, people = setup_three(db)
+    match(db, event, people)
+    with pytest.raises(sqlite3.IntegrityError, match="cannot be deleted"):
+        db.execute("UPDATE events SET deleted_at = 'now' WHERE id = ?", (event,))
+
+
+def test_deleted_event_cannot_be_matched(db: sqlite3.Connection) -> None:
+    event, _ = setup_three(db)
+    db.execute("UPDATE events SET deleted_at = 'now' WHERE id = ?", (event,))
+    with pytest.raises(sqlite3.IntegrityError, match="cannot be matched"):
+        db.execute("UPDATE events SET status = 'matched' WHERE id = ?", (event,))

@@ -20,7 +20,11 @@ CREATE TABLE events (
     -- write, the UI falls back to the default. Cosmetic: editable after matching.
     theme      TEXT NOT NULL DEFAULT 'christmas',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    matched_at TEXT
+    matched_at TEXT,
+    -- soft delete: set when the organiser deletes an open event; the app then ignores the
+    -- row (and its sign-ups), but nothing is lost. Undo: set it back to NULL. The slug
+    -- stays taken.
+    deleted_at TEXT
 ) STRICT;
 
 CREATE TABLE participants (
@@ -85,6 +89,20 @@ BEFORE UPDATE OF status ON events
 WHEN OLD.status = 'matched' AND NEW.status <> 'matched'
 BEGIN
     SELECT RAISE(ABORT, 'a matched event cannot be reopened');
+END;
+
+CREATE TRIGGER events_matched_not_deleted
+BEFORE UPDATE OF deleted_at ON events
+WHEN OLD.status = 'matched' AND NEW.deleted_at IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'a matched event cannot be deleted');
+END;
+
+CREATE TRIGGER events_deleted_not_matched
+BEFORE UPDATE OF status ON events
+WHEN OLD.deleted_at IS NOT NULL AND NEW.status = 'matched'
+BEGIN
+    SELECT RAISE(ABORT, 'a deleted event cannot be matched');
 END;
 
 CREATE TRIGGER participants_no_join_after_match

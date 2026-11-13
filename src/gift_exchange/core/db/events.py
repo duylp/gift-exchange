@@ -55,6 +55,13 @@ def create_event(
         )
     except sqlite3.IntegrityError as exc:
         if "UNIQUE" in str(exc):
+            deleted = conn.execute(
+                "SELECT 1 FROM events WHERE slug = ? AND deleted_at IS NOT NULL", (slug,)
+            ).fetchone()
+            if deleted:
+                raise SlugTaken(
+                    f"The link '{slug}' belonged to a deleted event; pick another."
+                ) from exc
             raise SlugTaken(f"An event with the link '{slug}' already exists.") from exc
         raise ValueError(
             "Invalid event: the link must be lowercase letters, digits and hyphens, "
@@ -69,7 +76,9 @@ def get_event(conn: sqlite3.Connection, event_id: int) -> Event:
     Raises:
         NotFound: If there is no such event.
     """
-    row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM events WHERE id = ? AND deleted_at IS NULL", (event_id,)
+    ).fetchone()
     if row is None:
         raise NotFound("No such event.")
     return event_from_row(row)
@@ -83,7 +92,9 @@ def get_event_by_slug(conn: sqlite3.Connection, slug: str) -> Event:
     Raises:
         NotFound: If there is no such event.
     """
-    row = conn.execute("SELECT * FROM events WHERE slug = ?", (slug.strip().lower(),)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM events WHERE slug = ? AND deleted_at IS NULL", (slug.strip().lower(),)
+    ).fetchone()
     if row is None:
         raise NotFound("No such event.")
     return event_from_row(row)
@@ -91,7 +102,10 @@ def get_event_by_slug(conn: sqlite3.Connection, slug: str) -> Event:
 
 def list_events(conn: sqlite3.Connection) -> list[Event]:
     """All events, newest first."""
-    return [event_from_row(r) for r in conn.execute("SELECT * FROM events ORDER BY id DESC")]
+    return [
+        event_from_row(r)
+        for r in conn.execute("SELECT * FROM events WHERE deleted_at IS NULL ORDER BY id DESC")
+    ]
 
 
 def list_events_joined_by(conn: sqlite3.Connection, email: str) -> list[Event]:
@@ -106,7 +120,7 @@ def list_events_joined_by(conn: sqlite3.Connection, email: str) -> list[Event]:
     """
     rows = conn.execute(
         "SELECT e.* FROM events AS e JOIN participants AS p ON p.event_id = e.id "
-        "WHERE p.email = ? ORDER BY e.id DESC",
+        "WHERE p.email = ? AND e.deleted_at IS NULL ORDER BY e.id DESC",
         (email.strip().lower(),),
     )
     return [event_from_row(r) for r in rows]
@@ -149,7 +163,7 @@ def update_event(
     try:
         cur = conn.execute(
             "UPDATE events SET title = ?, budget = ?, questions = COALESCE(?, questions), "
-            "theme = COALESCE(?, theme) WHERE id = ?",
+            "theme = COALESCE(?, theme) WHERE id = ? AND deleted_at IS NULL",
             (title.strip(), budget, questions, theme, event_id),
         )
     except sqlite3.IntegrityError as exc:
@@ -164,15 +178,26 @@ def update_event(
 
 
 def delete_event(conn: sqlite3.Connection, event_id: int) -> None:
-    """Delete an event that hasn't been matched, with its sign-ups and exclusions.
+    """Delete an event that hasn't been matched (a soft delete: nothing is erased).
 
-    Users are kept (they may be in other events). Deleting a missing event does nothing.
+    The event gets a `deleted_at` time; from then on every query ignores it, so its page,
+    sign-ups and exclusions disappear from the app. Undo by setting `deleted_at` back to
+    NULL in the database. The slug stays taken. Deleting a missing or already deleted
+    event does nothing.
+
+    Args:
+        conn: Database connection.
+        event_id: The event.
 
     Raises:
-        EventClosed: If the event has been matched (matches are never deleted).
+        EventClosed: If the event has been matched (matched events are kept for good).
     """
     try:
-        conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        conn.execute(
+            "UPDATE events SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+            "WHERE id = ? AND deleted_at IS NULL",
+            (event_id,),
+        )
     except sqlite3.IntegrityError as exc:
         raise EventClosed("A matched event can't be deleted.") from exc
 
