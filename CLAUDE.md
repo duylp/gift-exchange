@@ -38,7 +38,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, themes, R2 backups, CI/GHCR + arm64 images
 
 ## Code conventions
-- **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `tests/` and `migrations/` at repo root.
+- **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `src/gift_exchange/migrations/` (SQL files, shipped with the package); `tests/` at repo root.
 - **DB access:** stdlib `sqlite3`; all queries in `core/` DB module(s), returning dataclasses. UI never writes SQL.
 - **Types:** type hints everywhere; no type checker in v1.
 - **Docstrings:** Google style (`Args:` / `Returns:` / `Raises:`) on public functions and classes, explaining every parameter.

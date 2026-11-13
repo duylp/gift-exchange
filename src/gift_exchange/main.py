@@ -8,10 +8,14 @@ from nicegui import ui
 
 from gift_exchange import ui as _pages  # noqa: F401  (registers pages)
 from gift_exchange.config import load_settings
+from gift_exchange.core.migrations import migrate_database
 
 
 def main() -> None:
     settings = load_settings()
+    applied = migrate_database(settings.db_path)  # app won't start if this raises
+    if applied:
+        print(f"Applied migrations: {', '.join(f'{v:04d}' for v in applied)}")
     ui.run(
         title="Gift Exchange",
         favicon="🎁",

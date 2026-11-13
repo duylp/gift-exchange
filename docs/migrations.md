@@ -1,6 +1,6 @@
 # Migration engine
 
-Status: **design** (not yet implemented). Code will live in `src/gift_exchange/core/migrations.py`.
+Status: **implemented** in `src/gift_exchange/core/migrations.py` (CLI: `src/gift_exchange/migrate.py`, tests: `tests/test_migrations.py`).
 
 A minimal engine for evolving the SQLite schema with plain SQL files. No Alembic, no ORM —
 the schema exists only in these files.
@@ -11,10 +11,13 @@ snapshot taken automatically before every migration run (see [Backups](#backups)
 ## Files
 
 ```
-migrations/
+src/gift_exchange/migrations/
   0001_initial.sql
   0002_add_guesses.sql
 ```
+
+The folder lives inside the package so it ships with it (e.g. in the Docker image).
+Non-`.sql` files there (like its README) are ignored.
 
 - Name: `NNNN_short_description.sql`. `NNNN` is a 4-digit version, starting at `0001`,
   increasing by 1 with no gaps or duplicates. The engine refuses to run otherwise.
@@ -59,9 +62,14 @@ For each pending migration, in order:
 Each migration is its own transaction: if `0003` fails, `0001`–`0002` stay applied and the
 error names `0003`.
 
-Implementation note: Python's `sqlite3` `executescript()` commits any open transaction
-first, so the engine uses a connection with `isolation_level=None` (autocommit) and issues
-`BEGIN` / `COMMIT` itself around the script.
+Implementation note: connections come from `db.connect()` in autocommit mode
+(`isolation_level=None`). Python's `sqlite3` `executescript()` implicitly commits any open
+transaction before running, so `BEGIN` is sent **in the same `executescript()` call** as the
+script; the tracking insert, FK check and `COMMIT` then use plain `execute()`.
+
+The engine rejects scripts containing `BEGIN;`, `BEGIN TRANSACTION`, `COMMIT`, `ROLLBACK`,
+`END TRANSACTION` or `PRAGMA foreign_keys` (matched at the start of a line, so a trigger's
+`BEGIN … END` body is fine).
 
 ## Safety checks (before doing anything)
 
@@ -106,10 +114,14 @@ Uses `DB_PATH` from settings, like the app. On the Droplet it runs inside the co
 ## Python API
 
 ```python
-apply_migrations(conn, migrations_dir) -> list[int]   # versions applied
-migration_status(conn, migrations_dir) -> Status      # current, applied, pending
-snapshot(db_path, keep=5) -> Path                      # backup file written
+migrate_database(db_path) -> list[int]            # checks → snapshot → apply (startup, CLI up)
+apply_migrations(conn) -> list[int]               # versions applied, no snapshot
+migration_status(conn) -> Status                  # current, applied, pending + safety checks
+snapshot(db_path, version, keep=5) -> Path        # backup file written
 ```
+
+All take an optional `migrations_dir` (defaults to the package folder) so tests can use
+temporary folders.
 
 `apply_migrations` and `migration_status` take an open connection, so tests can use
 `:memory:`. Callers that work on a file (app startup, CLI) take the snapshot first.
