@@ -52,7 +52,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 
 ## Data model
 Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). Tables: users, events, participants, exclusions, matches. Later features add their own tables by migration (messages, guesses).
-- Event status `open` → `matched` (final). After matching, the DB blocks joins, sign-up edits, exclusion changes and deleting matched participants (triggers + FKs).
+- Event status `open` → `matched` (final). After matching, the DB blocks joins, sign-up edits, exclusion changes, budget changes, and deleting matched participants or the event (triggers + FKs). The title stays editable.
 - Same-event integrity via composite FKs `(event_id, participant id)`; exclusions stored once per pair with `a_id < b_id`.
 - All tables `STRICT`; timestamps UTC ISO-8601 text; budget whole S$.
 

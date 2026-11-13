@@ -46,13 +46,14 @@ def join_event(
         AlreadyJoined: If the user has already joined this event.
         NicknameTaken: If the nickname is in use in this event.
         EventClosed: If the event has been matched.
-        NotFound: If the event doesn't exist.
+        NotFound: If the event or user doesn't exist.
         ValueError: If the name or nickname is blank, or the number of answers is wrong.
     """
-    event = get_event(conn, event_id)
-    name, nickname, answers = check_signup(event, name, nickname, answers)
     try:
         with transaction(conn):
+            # Validate inside the transaction so the questions can't change under us.
+            event = get_event(conn, event_id)
+            name, nickname, answers = check_signup(event, name, nickname, answers)
             conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
             cur = conn.execute(
                 "INSERT INTO participants (event_id, user_id, nickname, answers) "
@@ -80,10 +81,10 @@ def update_signup(
     Returns:
         The updated participant.
     """
-    event = get_event(conn, event_id)
-    name, nickname, answers = check_signup(event, name, nickname, answers)
     try:
         with transaction(conn):
+            event = get_event(conn, event_id)
+            name, nickname, answers = check_signup(event, name, nickname, answers)
             conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
             cur = conn.execute(
                 "UPDATE participants SET nickname = ?, answers = ? "
@@ -153,4 +154,6 @@ def signup_error(exc: sqlite3.IntegrityError) -> DbError:
         return NicknameTaken("That nickname is taken in this event; pick another.")
     if "participants.user_id" in message:
         return AlreadyJoined("You've already joined this event.")
+    if "FOREIGN KEY" in message:  # unknown user_id, e.g. a stale session cookie
+        return NotFound("Your account wasn't found; please log in again.")
     raise exc

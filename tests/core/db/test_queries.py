@@ -243,3 +243,59 @@ def test_only_get_giftee_reads_matches() -> None:
             if re.search(r"\b(FROM|JOIN)\s+matches\b", line):
                 readers.append((path.name, line.strip()))
     assert readers == [("matches.py", "JOIN matches AS m ON m.giver_id = me.id")]
+
+
+# --- review fixes -------------------------------------------------------------------
+
+
+def test_failed_commit_rolls_back_and_connection_stays_usable(conn: sqlite3.Connection) -> None:
+    # A deferred foreign key is only checked at COMMIT, so COMMIT itself fails.
+    conn.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+    conn.execute(
+        "CREATE TABLE child (p INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED)"
+    )
+    with pytest.raises(sqlite3.IntegrityError), q.transaction(conn):
+        conn.execute("INSERT INTO child VALUES (42)")
+    assert not conn.in_transaction
+    assert conn.execute("SELECT COUNT(*) FROM child").fetchone()[0] == 0
+    with q.transaction(conn):  # next transaction works
+        conn.execute("INSERT INTO parent VALUES (1)")
+
+
+def test_budget_fixed_after_match_but_title_editable(
+    conn: sqlite3.Connection, event: q.Event
+) -> None:
+    for n in ("ann", "bob", "cat"):
+        signup(conn, event, n)
+    q.run_matching(conn, event.id)
+    with pytest.raises(q.EventClosed, match="budget"):
+        q.update_event(conn, event.id, event.title, 999, QUESTIONS)
+    renamed = q.update_event(conn, event.id, "Renamed", event.budget, QUESTIONS)
+    assert (renamed.title, renamed.budget) == ("Renamed", 30)
+
+
+def test_join_with_unknown_user_is_not_found(conn: sqlite3.Connection, event: q.Event) -> None:
+    with pytest.raises(q.NotFound, match="log in again"):
+        q.join_event(conn, event.id, 999, "Ghost", "ghost", ["a", "b"])
+    assert not conn.in_transaction
+
+
+def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
+    a, b, _ = (signup(conn, event, n) for n in ("ann", "bob", "cat"))
+    q.add_exclusion(conn, event.id, a.id, b.id)
+    other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
+    signup(conn, other, "zed")
+    q.delete_event(conn, event.id)
+    with pytest.raises(q.NotFound):
+        q.get_event(conn, event.id)
+    assert q.get_user(conn, a.user_id).name == "Ann"  # users kept
+    assert len(q.list_participants(conn, other.id)) == 1  # other events untouched
+    q.delete_event(conn, event.id)  # missing: no-op
+
+
+def test_matched_event_cannot_be_deleted(conn: sqlite3.Connection, event: q.Event) -> None:
+    for n in ("ann", "bob", "cat"):
+        signup(conn, event, n)
+    q.run_matching(conn, event.id)
+    with pytest.raises(q.EventClosed):
+        q.delete_event(conn, event.id)

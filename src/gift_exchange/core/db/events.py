@@ -4,7 +4,7 @@ import sqlite3
 from collections.abc import Sequence
 
 from gift_exchange.core.db._util import clean_list, encode_list, require
-from gift_exchange.core.db.errors import NotFound, QuestionsLocked, SlugTaken
+from gift_exchange.core.db.errors import EventClosed, NotFound, QuestionsLocked, SlugTaken
 from gift_exchange.core.db.models import Event, event_from_row
 
 
@@ -90,6 +90,8 @@ def update_event(
 
     Raises:
         QuestionsLocked: If the questions differ and someone has already signed up.
+        EventClosed: If the budget differs and the event has been matched (Santas may
+            already have bought gifts). The title can always change.
         NotFound: If there is no such event.
         ValueError: If the title or budget is invalid.
     """
@@ -102,7 +104,23 @@ def update_event(
     except sqlite3.IntegrityError as exc:
         if "locked" in str(exc):
             raise QuestionsLocked("Questions can't be changed once someone has signed up.") from exc
+        if "budget is fixed" in str(exc):
+            raise EventClosed("The budget can't change after matching.") from exc
         raise ValueError("The budget must be a whole number above 0.") from exc
     if cur.rowcount == 0:
         raise NotFound("No such event.")
     return get_event(conn, event_id)
+
+
+def delete_event(conn: sqlite3.Connection, event_id: int) -> None:
+    """Delete an event that hasn't been matched, with its sign-ups and exclusions.
+
+    Users are kept (they may be in other events). Deleting a missing event does nothing.
+
+    Raises:
+        EventClosed: If the event has been matched (matches are never deleted).
+    """
+    try:
+        conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    except sqlite3.IntegrityError as exc:
+        raise EventClosed("A matched event can't be deleted.") from exc

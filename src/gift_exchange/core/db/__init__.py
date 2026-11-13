@@ -21,6 +21,7 @@ from gift_exchange.core.db.errors import (
 )
 from gift_exchange.core.db.events import (
     create_event,
+    delete_event,
     get_event,
     get_event_by_slug,
     list_events,
@@ -54,6 +55,7 @@ __all__ = [
     "add_exclusion",
     "connect",
     "create_event",
+    "delete_event",
     "event_feasibility",
     "get_event",
     "get_event_by_slug",

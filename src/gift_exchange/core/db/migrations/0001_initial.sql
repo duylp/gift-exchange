@@ -72,6 +72,13 @@ BEGIN
     SELECT RAISE(ABORT, 'questions are locked once someone has signed up');
 END;
 
+CREATE TRIGGER events_budget_fixed_after_match
+BEFORE UPDATE OF budget ON events
+WHEN OLD.status = 'matched' AND NEW.budget IS NOT OLD.budget
+BEGIN
+    SELECT RAISE(ABORT, 'the budget is fixed: the event has been matched');
+END;
+
 CREATE TRIGGER events_matched_is_final
 BEFORE UPDATE OF status ON events
 WHEN OLD.status = 'matched' AND NEW.status <> 'matched'

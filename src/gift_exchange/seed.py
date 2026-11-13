@@ -51,12 +51,16 @@ def main() -> int:
             pass
 
         event = db.create_event(conn, SLUG, "Christmas 2026 🎄", 30, QUESTIONS)
-        ids = {}
-        for name, nickname, answers in PEOPLE:
-            email = name.lower().replace(" ", ".") + "@example.com"
-            user = db.get_or_create_user(conn, email)
-            ids[name] = db.join_event(conn, event.id, user.id, name, nickname, answers).id
-        db.add_exclusion(conn, event.id, ids[COUPLE[0]], ids[COUPLE[1]])
+        try:
+            ids = {}
+            for name, nickname, answers in PEOPLE:
+                email = name.lower().replace(" ", ".") + "@example.com"
+                user = db.get_or_create_user(conn, email)
+                ids[name] = db.join_event(conn, event.id, user.id, name, nickname, answers).id
+            db.add_exclusion(conn, event.id, ids[COUPLE[0]], ids[COUPLE[1]])
+        except BaseException:
+            db.delete_event(conn, event.id)  # all-or-nothing: next run starts clean
+            raise
         print(
             f"Created '{SLUG}' with {len(PEOPLE)} participants and "
             f"{COUPLE[0]} ✕ {COUPLE[1]} excluded, in {settings.db_path}."

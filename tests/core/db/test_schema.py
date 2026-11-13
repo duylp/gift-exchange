@@ -160,3 +160,14 @@ def test_match_rows_are_one_to_one(db: sqlite3.Connection) -> None:
         db.execute("INSERT INTO matches VALUES (?, ?, ?)", (event, c, b))  # b twice as giftee
     with pytest.raises(sqlite3.IntegrityError):
         db.execute("INSERT INTO matches VALUES (?, ?, ?)", (event, c, c))  # self
+
+
+def test_budget_fixed_after_match(db: sqlite3.Connection) -> None:
+    event, people = setup_three(db)
+    db.execute("UPDATE events SET budget = 40 WHERE id = ?", (event,))  # ok while open
+    match(db, event, people)
+    with pytest.raises(sqlite3.IntegrityError, match="budget is fixed"):
+        db.execute("UPDATE events SET budget = 50 WHERE id = ?", (event,))
+    db.execute(
+        "UPDATE events SET budget = 40, title = 'New' WHERE id = ?", (event,)
+    )  # unchanged ok

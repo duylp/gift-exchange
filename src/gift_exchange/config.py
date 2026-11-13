@@ -27,8 +27,11 @@ def load_settings() -> Settings:
         raise RuntimeError("SECRET_KEY is not set (copy .env.example to .env)")
     dev = os.environ.get("DEV", "0") == "1"
     resend_api_key = os.environ.get("RESEND_API_KEY", "")
+    email_from = os.environ.get("EMAIL_FROM", "").strip()
     if not dev and not resend_api_key:
         raise RuntimeError("RESEND_API_KEY is required when DEV is not 1")
+    if not dev and not email_from:
+        raise RuntimeError("EMAIL_FROM is required when DEV is not 1")
     admins = os.environ.get("ADMIN_EMAILS", "")
     return Settings(
         dev=dev,
@@ -37,7 +40,7 @@ def load_settings() -> Settings:
         base_url=os.environ.get("BASE_URL", "http://localhost:8080").rstrip("/"),
         db_path=Path(os.environ.get("DB_PATH", "data/gift.db")),
         resend_api_key=resend_api_key,
-        email_from=os.environ.get("EMAIL_FROM", ""),
+        email_from=email_from,
         host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", "8080")),
     )
