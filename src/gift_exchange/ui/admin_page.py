@@ -376,18 +376,9 @@ def _delete_button(event: db.Event) -> None:
 
 # --- clue questions ---------------------------------------------------------------------------
 
-SUGGESTED_QUESTIONS = [
-    "What do you do for fun?",
-    "Favourite colour?",
-    "Favourite snack or drink?",
-    "Something you'd love but would never buy yourself?",
-    "Anything you dislike or are allergic to?",
-    "What's your clothing size?",
-]
-
 
 def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
-    """Editable list of clue questions: one box each, reorder, delete, add, suggestions.
+    """Editable list of clue questions: one box each, reorder, delete, add.
 
     The list lives in a local variable only while the form is open; nothing is saved until
     the form's own button is pressed.
@@ -402,9 +393,9 @@ def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
     questions = list(initial)
     focus_index: list[int | None] = [None]  # row to focus after the next refresh
 
-    def insert(index: int, text: str = "") -> None:
-        questions.insert(index, text)
-        focus_index[0] = index if not text else None
+    def insert(index: int) -> None:
+        questions.insert(index, "")
+        focus_index[0] = index
         rows.refresh()
 
     def remove(index: int) -> None:
@@ -427,9 +418,7 @@ def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
     @ui.refreshable
     def rows() -> None:
         if not questions:
-            ui.label("No questions yet. Add one or pick a suggestion.").classes(
-                "text-sm text-gray-600"
-            )
+            ui.label("No questions yet.").classes("text-sm text-gray-600")
         last = len(questions) - 1
         for i, text in enumerate(questions):
             with ui.row().classes("w-full items-center no-wrap gap-0"):
@@ -461,14 +450,6 @@ def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
         ui.button("Add question", icon="add", on_click=lambda: insert(len(questions))).props(
             "flat dense"
         )
-        unused = [q for q in SUGGESTED_QUESTIONS if q not in {s.strip() for s in questions}]
-        if unused:
-            ui.label("Suggestions (click to add):").classes("text-xs text-gray-500")
-            with ui.row().classes("gap-1 -mt-2"):
-                for q in unused:
-                    ui.chip(q, icon="add", on_click=lambda q=q: insert(len(questions), q)).props(
-                        "outline dense"
-                    )
 
     rows()
     return lambda: [q.strip() for q in questions if q.strip()]
