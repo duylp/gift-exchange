@@ -125,10 +125,17 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         values = [a.value for a in answers]
         try:
             with open_db() as conn:
-                if editing:
-                    db.update_signup(conn, event.id, email, name.value, nickname.value, values)
-                else:
-                    db.join_event(conn, event.id, email, name.value, nickname.value, values)
+                save = db.update_signup if editing else db.join_event
+                # shown_sections: refuse if the organiser changed the questions meanwhile.
+                save(
+                    conn,
+                    event.id,
+                    email,
+                    name.value,
+                    nickname.value,
+                    values,
+                    shown_sections=event.sections,
+                )
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
             return

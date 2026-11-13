@@ -25,5 +25,10 @@ class EventClosed(DbError):
     """The event has been matched, so sign-ups, edits and exclusions are fixed."""
 
 
+class QuestionsChanged(DbError):
+    """The event's questions changed after the sign-up form was shown (answers would
+    otherwise be saved against the wrong questions)."""
+
+
 class QuestionsLocked(DbError):
     """The event's questions can't change because someone has already signed up."""

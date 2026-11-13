@@ -15,12 +15,14 @@ from gift_exchange.core.db.errors import (
     EventClosed,
     NicknameTaken,
     NotFound,
+    QuestionsChanged,
 )
 from gift_exchange.core.db.events import get_event
 from gift_exchange.core.db.models import (
     PARTICIPANT_SELECT,
     Event,
     Participant,
+    Section,
     participant_from_row,
 )
 
@@ -32,6 +34,8 @@ def join_event(
     name: str,
     nickname: str,
     answers: Sequence[str],
+    *,
+    shown_sections: Sequence[Section] | None = None,
 ) -> Participant:
     """Sign a person up for an event.
 
@@ -43,6 +47,9 @@ def join_event(
         name: Their real name (required).
         nickname: Anonymous name shown to their Santa (required, unique in the event).
         answers: One answer per event question, in order.
+        shown_sections: The question sections the form showed (`event.sections` when it
+            was built). If given and the event's sections differ now, nothing is saved.
+            The UI always passes it; None skips the check (scripts, tests).
 
     Returns:
         The new participant.
@@ -52,6 +59,7 @@ def join_event(
         NicknameTaken: If the nickname is in use in this event.
         EventClosed: If the event has been matched.
         NotFound: If the event doesn't exist.
+        QuestionsChanged: If `shown_sections` no longer matches the event.
         ValueError: If the email is invalid, the name or nickname is blank, or the number
             of answers is wrong.
     """
@@ -60,7 +68,7 @@ def join_event(
         with transaction(conn):
             # Validate inside the transaction so the questions can't change under us.
             event = get_event(conn, event_id)
-            name, nickname, answers = check_signup(event, name, nickname, answers)
+            name, nickname, answers = check_signup(event, name, nickname, answers, shown_sections)
             cur = conn.execute(
                 "INSERT INTO participants (event_id, email, name, nickname, answers) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -78,6 +86,8 @@ def update_signup(
     name: str,
     nickname: str,
     answers: Sequence[str],
+    *,
+    shown_sections: Sequence[Section] | None = None,
 ) -> Participant:
     """Change a person's sign-up (allowed until the event is matched).
 
@@ -91,7 +101,7 @@ def update_signup(
     try:
         with transaction(conn):
             event = get_event(conn, event_id)
-            name, nickname, answers = check_signup(event, name, nickname, answers)
+            name, nickname, answers = check_signup(event, name, nickname, answers, shown_sections)
             cur = conn.execute(
                 "UPDATE participants SET name = ?, nickname = ?, answers = ? "
                 "WHERE event_id = ? AND email = ?",
@@ -155,8 +165,26 @@ def get_participant_by_id(conn: sqlite3.Connection, participant_id: int) -> Part
 
 
 def check_signup(
-    event: Event, name: str, nickname: str, answers: Sequence[str]
+    event: Event,
+    name: str,
+    nickname: str,
+    answers: Sequence[str],
+    shown_sections: Sequence[Section] | None = None,
 ) -> tuple[str, str, list[str]]:
+    """Validate and clean a sign-up against the event (see `join_event` for the args).
+
+    Returns:
+        The stripped name, nickname and answers.
+
+    Raises:
+        QuestionsChanged: If `shown_sections` is given and differs from the event's.
+        ValueError: If the name or nickname is blank or the number of answers is wrong.
+    """
+    if shown_sections is not None and tuple(shown_sections) != event.sections:
+        raise QuestionsChanged(
+            "The questions changed while you were filling in the form. "
+            "Reload the page and check your answers."
+        )
     name, nickname = name.strip(), nickname.strip()
     require(name, "Your name is required.")
     require(nickname, "A nickname is required.")

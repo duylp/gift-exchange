@@ -121,6 +121,27 @@ def test_join_errors(conn: sqlite3.Connection, event: q.Event) -> None:
     assert not conn.in_transaction
 
 
+def test_signup_refused_if_questions_changed(conn: sqlite3.Connection, event: q.Event) -> None:
+    shown = event.sections
+    # The organiser reorders the questions while the form is open (allowed: nobody joined).
+    q.update_event(
+        conn, event.id, event.title, 30, [q.Section("", ("Favourite colour?", "Hobbies?"))]
+    )
+    with pytest.raises(q.QuestionsChanged):
+        q.join_event(
+            conn, event.id, "ann@example.com", "Ann", "ann", ["ski", "red"], shown_sections=shown
+        )
+    assert q.list_participants(conn, event.id) == []
+    # A form built from the current questions is accepted.
+    current = q.get_event(conn, event.id).sections
+    p = q.join_event(
+        conn, event.id, "ann@example.com", "Ann", "ann", ["red", "ski"], shown_sections=current
+    )
+    assert p.answers == ("red", "ski")
+    with pytest.raises(q.QuestionsChanged):
+        q.update_signup(conn, event.id, p.email, "Ann", "ann", ["a", "b"], shown_sections=shown)
+
+
 def test_update_signup(conn: sqlite3.Connection, event: q.Event) -> None:
     ann = signup(conn, event, "ann")
     p = q.update_signup(conn, event.id, ann.email, "Ann T", "Comet", ["x", "y"])

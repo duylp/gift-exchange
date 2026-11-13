@@ -16,6 +16,7 @@ from gift_exchange.core.db.errors import (
     EventClosed,
     NicknameTaken,
     NotFound,
+    QuestionsChanged,
     QuestionsLocked,
     SlugTaken,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "NicknameTaken",
     "NotFound",
     "Participant",
+    "QuestionsChanged",
     "QuestionsLocked",
     "Section",
     "SlugTaken",
