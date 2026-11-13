@@ -25,7 +25,8 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Identity:** one account per email (User) across events; a Participant row per user per event. (Deferred: deriving "last year's match" exclusions automatically — no previous event exists yet.)
 - **Joining:** anyone with the event link `/e/<slug>` can sign up; organiser can remove people before matching.
 - **Budget:** one fixed amount per event, set by the organiser.
-- Sign-up: nickname + answers to the event's clue questions (answers stored as JSON).
+- Sign-up: real name (on the user, shown to the organiser and at the reveal; prefilled next time), anonymous nickname (per event, shown to their Santa), answers to the event's clue questions. Editable until the event is matched.
+- **Questions are locked** once anyone has signed up (DB trigger); answers are stored in question order.
 - **Admin page** (one plain page, admin only): create event (slug, title, budget); clue questions as a textarea, one per line (stored as JSON on the Event); participant list with remove; exclusions via two dropdowns + add; "Run matching" button that works only once per event.
 - **Matching** (`core/matching.py`): no self, no reciprocal pairs, two-way exclusions (entered on the admin page).
   - Algorithm: shuffle-until-valid (rejection sampling) with an attempt cap — exactly uniform over valid assignments. Not greedy edge-picking (2021 approach: biased, dead-ends).
@@ -49,8 +50,11 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Check before commit:** `uv run ruff format . && uv run ruff check . && uv run pytest`
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
 
-## Data model (draft)
-User, Event, Participant, Exclusion, Match, Message, Guess.
+## Data model
+Schema: `src/gift_exchange/migrations/` (start at `0001_initial.sql`). Tables: users, events, participants, exclusions, matches. Later features add their own tables by migration (messages, guesses).
+- Event status `open` → `matched` (final). After matching, the DB blocks joins, sign-up edits, exclusion changes and deleting matched participants (triggers + FKs).
+- Same-event integrity via composite FKs `(event_id, participant id)`; exclusions stored once per pair with `a_id < b_id`.
+- All tables `STRICT`; timestamps UTC ISO-8601 text; budget whole S$.
 
 ## Task list
 `TODO.md` tracks tasks and progress only; it refers back here for facts. Record facts and decisions here, never duplicated in TODO.md. Tick items off as they are done.
