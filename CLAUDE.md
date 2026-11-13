@@ -23,7 +23,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
   - Do not use NiceGUI `app.storage.user`.
 - **Email:** `httpx` POST to the Resend API (no SDK); must send a `User-Agent` header (Resend returns 403 without one). Dev backend (`DEV=1`) prints emails, including login links, to the terminal.
 - **Multi-event:** the app is occasion-agnostic; an event has a slug, title, budget and theme.
-- **Themes:** per event, chosen from presets in code (`db.THEMES` names: `plain`, `christmas`; styles in `ui/themes.py`). Stored as `events.theme` (no CHECK — a new theme is a code change, no migration; core validates on write, UI falls back to `plain`). Editable after matching. Only `/e/<slug>` uses the event's theme; home, login and admin pages are `plain`. No custom colours/CSS from the admin.
+- **Themes:** per event, chosen from presets in code (`db.THEMES` names: `plain`, `christmas`; styles in `ui/themes.py`). Stored as `events.theme` (no CHECK — a new theme is a code change, no migration; core validates on write, UI falls back to `plain`). Editable after matching. `/e/<slug>` uses the event's theme; the logged-in home page uses the theme of the newest event the person joined (the top card); logged-out home, login and admin pages are `plain`. No custom colours/CSS from the admin.
 
 ## v1 scope
 - **Organiser:** the repo owner hosts all events. Single admin, identified by email from an env var (`ADMIN_EMAILS`); no per-event organiser roles in v1.

@@ -19,16 +19,18 @@ def index(request: Request) -> None:
     """
     email = current_email(request)
     ui.page_title("Gift exchange")
-    with page_frame():
-        if email is None:
+    if email is None:
+        with page_frame():
             ui.label("Joining an exchange? Open the link from your group chat.")
             ui.label("Already joined? Log in to see your exchanges.").classes("-mt-2")
             login_form("/")
-            return
+        return
 
-        with open_db() as conn:
-            joined = db.list_events_joined_by(conn, email)
+    with open_db() as conn:
+        joined = db.list_events_joined_by(conn, email)
 
+    # Styled like the top card (newest event joined); plain if none.
+    with page_frame(theme=joined[0].theme if joined else "plain"):
         _your_exchanges(joined)
         if current_admin(request):
             _organiser()

@@ -1,7 +1,7 @@
 """How each event theme looks. The theme names live in `db.THEMES`; this maps them to styles.
 
-A theme is applied per page by `layout.page_frame(theme=...)`. Only the event page uses the
-event's theme; every other page is "plain".
+A theme is applied per page by `layout.page_frame(theme=...)`: the event page uses its
+event's theme, the logged-in home page that of the newest event joined; other pages "plain".
 """
 
 from dataclasses import dataclass, field

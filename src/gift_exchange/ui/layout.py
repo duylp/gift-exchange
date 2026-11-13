@@ -48,8 +48,8 @@ def page_frame(max_width: str = "max-w-md", theme: str = "plain") -> ui.column:
 
     Args:
         max_width: Tailwind max-width class for the column (wider for admin pages).
-        theme: Name of the theme to style the page with (see `ui/themes.py`). Only the
-            event page passes the event's theme; unknown names fall back to "plain".
+        theme: Name of the theme to style the page with (see `ui/themes.py`); unknown
+            names fall back to "plain".
     """
     look = get_theme(theme)
     _apply(look)
