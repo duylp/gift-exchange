@@ -5,10 +5,8 @@ Status: **design** (not yet implemented). Code will live in `src/gift_exchange/c
 A minimal engine for evolving the SQLite schema with plain SQL files. No Alembic, no ORM —
 the schema exists only in these files.
 
-**Forward-only.** There are no `down` scripts. The undo is a database snapshot taken
-automatically before every migration run (see [Backups](#backups)). A `down` script can only
-restore the schema, not data an `up` dropped; restoring a snapshot gets both back, and it
-means half as many files to write and test.
+**Forward-only.** Migrations are only ever applied. To roll one back, restore the database
+snapshot taken automatically before every migration run (see [Backups](#backups)).
 
 ## Files
 
@@ -127,7 +125,6 @@ snapshot(db_path, keep=5) -> Path                      # backup file written
 
 ## Not doing (v1)
 
-- `down` / revert scripts — restore a snapshot instead.
 - Python (non-SQL) migrations.
 - Locking against concurrent migrators — there is only ever one app process (NiceGUI runs a
   single worker).
