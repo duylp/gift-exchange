@@ -7,6 +7,7 @@ Match secrecy: these pages never show who got whom — only counts.
 """
 
 import random
+from collections.abc import Callable
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
@@ -89,14 +90,7 @@ def _new_event_form() -> None:
         .classes("w-full")
     )
     budget = ui.number("Budget (S$)", value=30, min=1, precision=0).props("outlined")
-    questions = (
-        ui.textarea(
-            "Clue questions (one per line)",
-            placeholder="What do you do for fun?\nFavourite colour?",
-        )
-        .props("outlined autogrow")
-        .classes("w-full")
-    )
+    get_questions = _question_editor([])
 
     def create() -> None:
         results = [slug.validate(), title.validate()]
@@ -113,7 +107,7 @@ def _new_event_form() -> None:
                     slug.value.strip().lower(),
                     title.value,
                     amount,
-                    _lines(questions.value),
+                    get_questions(),
                 )
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
@@ -203,23 +197,17 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
         ui.label("🔒 Budget is fixed after the draw.").classes("text-xs text-gray-500 -mt-2")
 
     questions_locked = has_people or not event.is_open
-    questions = (
-        ui.textarea("Clue questions (one per line)", value="\n".join(event.questions))
-        .props("outlined autogrow")
-        .classes("w-full")
-    )
     if questions_locked:
-        questions.props("readonly")
-        ui.label("🔒 Questions are locked because people have joined.").classes(
-            "text-xs text-gray-500 -mt-2"
-        )
+        _question_list(event.questions)
+    else:
+        get_questions = _question_editor(event.questions)
 
     def save() -> None:
         amount = _whole_number(budget.value)
         if amount is None:
             ui.notify("Budget must be a whole number above 0.", type="warning")
             return
-        new_questions = list(event.questions) if questions_locked else _lines(questions.value)
+        new_questions = list(event.questions) if questions_locked else get_questions()
         try:
             with open_db() as conn:
                 db.update_event(conn, event.id, title.value, amount, new_questions)
@@ -386,6 +374,116 @@ def _delete_button(event: db.Event) -> None:
     ui.button("Delete event", on_click=delete).props("flat color=negative")
 
 
+# --- clue questions ---------------------------------------------------------------------------
+
+SUGGESTED_QUESTIONS = [
+    "What do you do for fun?",
+    "Favourite colour?",
+    "Favourite snack or drink?",
+    "Something you'd love but would never buy yourself?",
+    "Anything you dislike or are allergic to?",
+    "What's your clothing size?",
+]
+
+
+def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
+    """Editable list of clue questions: one box each, reorder, delete, add, suggestions.
+
+    The list lives in a local variable only while the form is open; nothing is saved until
+    the form's own button is pressed.
+
+    Args:
+        initial: The questions to start with, in order.
+
+    Returns:
+        A function giving the current questions (trimmed, blanks dropped), for the save
+        handler to call.
+    """
+    questions = list(initial)
+    focus_index: list[int | None] = [None]  # row to focus after the next refresh
+
+    def insert(index: int, text: str = "") -> None:
+        questions.insert(index, text)
+        focus_index[0] = index if not text else None
+        rows.refresh()
+
+    def remove(index: int) -> None:
+        del questions[index]
+        rows.refresh()
+
+    def move(index: int, step: int) -> None:
+        other = index + step
+        questions[index], questions[other] = questions[other], questions[index]
+        rows.refresh()
+
+    def set_text(index: int, text: str) -> None:
+        questions[index] = text
+
+    ui.label("Clue questions").classes("font-medium")
+    ui.label("Everyone answers these when they join; their Santa sees the answers.").classes(
+        "text-xs text-gray-500 -mt-3"
+    )
+
+    @ui.refreshable
+    def rows() -> None:
+        if not questions:
+            ui.label("No questions yet. Add one or pick a suggestion.").classes(
+                "text-sm text-gray-600"
+            )
+        last = len(questions) - 1
+        for i, text in enumerate(questions):
+            with ui.row().classes("w-full items-center no-wrap gap-0"):
+                box = (
+                    ui.input(
+                        placeholder=f"Question {i + 1}",
+                        value=text,
+                        on_change=lambda e, i=i: set_text(i, e.value),
+                    )
+                    .props(f'outlined dense prefix="{i + 1}."')
+                    .classes("grow")
+                    .on("keydown.enter", lambda i=i: insert(i + 1))
+                )
+                if focus_index[0] == i:
+                    box.props("autofocus")
+                up = ui.button(icon="arrow_upward", on_click=lambda i=i: move(i, -1))
+                up.props("flat round dense size=sm").tooltip("Move up")
+                down = ui.button(icon="arrow_downward", on_click=lambda i=i: move(i, 1))
+                down.props("flat round dense size=sm").tooltip("Move down")
+                ui.button(icon="close", on_click=lambda i=i: remove(i)).props(
+                    "flat round dense size=sm color=negative"
+                ).tooltip("Remove")
+                if i == 0:
+                    up.disable()
+                if i == last:
+                    down.disable()
+        focus_index[0] = None
+
+        ui.button("Add question", icon="add", on_click=lambda: insert(len(questions))).props(
+            "flat dense"
+        )
+        unused = [q for q in SUGGESTED_QUESTIONS if q not in {s.strip() for s in questions}]
+        if unused:
+            ui.label("Suggestions (click to add):").classes("text-xs text-gray-500")
+            with ui.row().classes("gap-1 -mt-2"):
+                for q in unused:
+                    ui.chip(q, icon="add", on_click=lambda q=q: insert(len(questions), q)).props(
+                        "outline dense"
+                    )
+
+    rows()
+    return lambda: [q.strip() for q in questions if q.strip()]
+
+
+def _question_list(questions: list[str]) -> None:
+    """Read-only numbered list of an event's locked questions."""
+    ui.label("Clue questions").classes("font-medium")
+    if not questions:
+        ui.label("None.").classes("text-sm text-gray-600")
+    for i, q in enumerate(questions, 1):
+        ui.label(f"{i}. {q}").classes("text-sm")
+    ui.label("🔒 Questions are locked because people have joined.").classes("text-xs text-gray-500")
+
+
 # --- helpers ---------------------------------------------------------------------------------
 
 
@@ -415,10 +513,6 @@ def _status_badge(event: db.Event) -> None:
         ui.badge("open", color="blue")
     else:
         ui.badge("matched", color="green")
-
-
-def _lines(text: str | None) -> list[str]:
-    return [line.strip() for line in (text or "").splitlines() if line.strip()]
 
 
 def _whole_number(value: float | None) -> int | None:
