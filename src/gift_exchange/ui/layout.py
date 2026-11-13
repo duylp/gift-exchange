@@ -1,5 +1,7 @@
 """Shared page layout: a centred column with a link home at the top, styled by a theme."""
 
+import random
+
 from nicegui import ui
 
 from gift_exchange.core import db
@@ -24,42 +26,42 @@ _SOCK_SVG = """<svg viewBox="0 0 32 40" width="0.8em" height="1em">
 <rect x="6" y="4" width="16" height="7" rx="2" fill="#fff" stroke="#cbd5e1"/>
 </svg>"""
 
-# Falling items as (kind, left %, fall seconds, delay seconds, size rem): fixed positions,
-# so no randomness. Mostly snow, with a few socks and candy canes.
+# Falling items as (kind, left %, fall seconds, delay seconds, size rem): fixed positions.
+# Mostly snow, with a few socks and candy canes (each tilted at random, see `_apply`).
 _FALLING = [
     ("flake", 3, 14, 0, 0.9),
-    ("cane", 11, 18, 6, 1.9),
+    ("cane", 11, 18, 6, 2.6),
     ("flake", 19, 12, 3, 1.1),
-    ("sock", 27, 16, 9, 1.9),
+    ("sock", 27, 16, 9, 2.6),
     ("flake", 35, 20, 1, 0.6),
     ("flake", 43, 13, 7, 1.0),
-    ("cane", 51, 17, 4, 1.9),
+    ("cane", 51, 17, 4, 2.6),
     ("flake", 59, 15, 11, 0.9),
-    ("sock", 67, 19, 2, 1.9),
+    ("sock", 67, 19, 2, 2.6),
     ("flake", 75, 12, 8, 1.1),
-    ("cane", 83, 16, 5, 1.9),
+    ("cane", 83, 16, 5, 2.6),
     ("flake", 91, 14, 10, 0.7),
-    ("sock", 97, 18, 3, 1.9),
+    ("sock", 97, 18, 3, 2.6),
 ]
 
 _SNOW_CSS = """
 .theme-snow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .theme-snow > * {
-    position: absolute; top: -2.5rem; line-height: 1;
+    position: absolute; top: -4rem; line-height: 1;
     animation: theme-fall linear infinite;
 }
 .theme-snow > .theme-flake { color: #94a3b8; opacity: 0.55; }
-.theme-snow > .theme-toy { opacity: 0.8; animation-name: theme-sway; }
+.theme-snow > .theme-toy { opacity: 0.8; animation-name: theme-sway; --tilt: 0deg; }
 .theme-snow svg { display: block; }
 @keyframes theme-fall {
-    to { transform: translateY(calc(100vh + 5rem)) rotate(180deg); }
+    to { transform: translateY(calc(100vh + 8rem)) rotate(180deg); }
 }
 @keyframes theme-sway {
-    0%   { transform: translateY(0) rotate(-15deg); }
-    25%  { transform: translateY(calc(25vh + 1.25rem)) rotate(15deg); }
-    50%  { transform: translateY(calc(50vh + 2.5rem)) rotate(-15deg); }
-    75%  { transform: translateY(calc(75vh + 3.75rem)) rotate(15deg); }
-    100% { transform: translateY(calc(100vh + 5rem)) rotate(-15deg); }
+    0%   { transform: translateY(0) rotate(calc(var(--tilt) - 15deg)); }
+    25%  { transform: translateY(calc(25vh + 2rem)) rotate(calc(var(--tilt) + 15deg)); }
+    50%  { transform: translateY(calc(50vh + 4rem)) rotate(calc(var(--tilt) - 15deg)); }
+    75%  { transform: translateY(calc(75vh + 6rem)) rotate(calc(var(--tilt) + 15deg)); }
+    100% { transform: translateY(calc(100vh + 8rem)) rotate(calc(var(--tilt) - 15deg)); }
 }
 @media (prefers-reduced-motion: reduce) { .theme-snow { display: none; } }
 """
@@ -121,6 +123,8 @@ def _apply(look: Theme) -> None:
                 else:
                     svg = _SOCK_SVG if kind == "sock" else _CANE_SVG
                     item = ui.html(svg, sanitize=False).classes("theme-toy")
+                    # Random tilt per page load; it sways ±15° around it while falling.
+                    item.style(f"--tilt: {random.randint(-180, 180)}deg")
                 item.style(
                     f"left: {left}%; font-size: {size}rem; "
                     f"animation-duration: {fall}s; animation-delay: -{delay}s"
