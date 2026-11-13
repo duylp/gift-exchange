@@ -4,7 +4,7 @@ Modules: `tokens` (login links, sessions), `guards` (admin check, safe redirects
 Plain Python: no NiceGUI imports.
 """
 
-from gift_exchange.core.auth.guards import Cooldown, is_admin, safe_next
+from gift_exchange.core.auth.guards import Cooldown, is_admin, normalize_email, safe_next
 from gift_exchange.core.auth.tokens import (
     LOGIN_LINK_MAX_AGE,
     SESSION_MAX_AGE,
@@ -25,6 +25,7 @@ __all__ = [
     "is_admin",
     "make_login_token",
     "make_session",
+    "normalize_email",
     "read_login_token",
     "read_session",
     "safe_next",

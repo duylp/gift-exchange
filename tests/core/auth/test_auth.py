@@ -10,6 +10,7 @@ from gift_exchange.core.auth import (
     is_admin,
     make_login_token,
     make_session,
+    normalize_email,
     read_login_token,
     read_session,
     safe_next,
@@ -136,3 +137,16 @@ def test_cooldown_forget_allows_retry() -> None:
     cd.forget("a")
     assert cd.allow("a")
     cd.forget("never-seen")  # no error
+
+
+@pytest.mark.parametrize("given", [" Ann@Example.COM ", "ann.tan+gift@mail.example.sg"])
+def test_normalize_email_ok(given: str) -> None:
+    assert normalize_email(given) == given.strip().lower()
+
+
+@pytest.mark.parametrize(
+    "given", ["", "ann", "@example.com", "ann@", "ann@localhost", "a@b@c.com", "a b@c.com", "ann@."]
+)
+def test_normalize_email_rejects(given: str) -> None:
+    with pytest.raises(ValueError, match="email"):
+        normalize_email(given)

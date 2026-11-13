@@ -4,6 +4,33 @@ import time
 from collections.abc import Callable
 
 
+def normalize_email(email: str) -> str:
+    """Lowercase and strip an email address, checking it looks like one.
+
+    The one email check for the app: the login form and sign-ups both use it.
+
+    Args:
+        email: The address as typed or stored.
+
+    Returns:
+        The stripped, lowercased address.
+
+    Raises:
+        ValueError: If it isn't `local@domain.tld`-shaped (no spaces, one "@", a "." in
+            the domain).
+    """
+    email = email.strip().lower()
+    local, _, domain = email.partition("@")
+    if (
+        not local
+        or "@" in domain
+        or "." not in domain.strip(".")
+        or any(c.isspace() for c in email)
+    ):
+        raise ValueError("Not a valid email address.")
+    return email
+
+
 def is_admin(email: str | None, admin_emails: frozenset[str]) -> bool:
     """Whether a logged-in email is an organiser.
 

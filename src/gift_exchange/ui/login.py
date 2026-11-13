@@ -10,10 +10,12 @@ from nicegui import app, ui
 
 from gift_exchange.config import get_settings
 from gift_exchange.core.auth import (
+    LOGIN_LINK_MAX_AGE,
     Cooldown,
     LinkExpired,
     LinkInvalid,
     make_login_token,
+    normalize_email,
     read_login_token,
     safe_next,
 )
@@ -107,8 +109,9 @@ def login_form(next_path: str) -> None:
         button = ui.button("Send me a link").classes("w-full")
 
     async def submit() -> None:
-        email = (email_input.value or "").strip().lower()
-        if "@" not in email or "." not in email.split("@")[-1]:
+        try:
+            email = normalize_email(email_input.value or "")
+        except ValueError:
             ui.notify("Please enter a valid email address.", type="warning")
             return
         if not _cooldown.allow(email):
@@ -134,7 +137,7 @@ def login_form(next_path: str) -> None:
             sent.clear()
             ui.label(f"Check your email ({email}) 📬").classes("text-lg font-semibold")
             ui.label(
-                "Tap the link in it to log in. It works for 15 minutes. "
+                f"Tap the link in it to log in. It works for {LOGIN_LINK_MAX_AGE // 60} minutes. "
                 "Not there? Check your spam folder, or check the address and try again."
             )
             ui.button("Use a different email", on_click=lambda: _reset()).props("flat")

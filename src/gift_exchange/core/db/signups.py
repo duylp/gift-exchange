@@ -7,7 +7,8 @@ email comes from the signed login cookie, never from a form field.
 import sqlite3
 from collections.abc import Sequence
 
-from gift_exchange.core.db._util import encode_list, normalize_email, require
+from gift_exchange.core.auth import normalize_email
+from gift_exchange.core.db._util import encode_list, require
 from gift_exchange.core.db.connection import transaction
 from gift_exchange.core.db.errors import (
     AlreadyJoined,
