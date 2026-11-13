@@ -28,20 +28,20 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - Sign-up: real name (on the user, shown to the organiser and at the reveal; prefilled next time), anonymous nickname (per event, shown to their Santa), answers to the event's clue questions. Editable until the event is matched.
 - **Questions are locked** once anyone has signed up (DB trigger); answers are stored in question order.
 - **Admin page** (one plain page, admin only): create event (slug, title, budget); clue questions as a textarea, one per line (stored as JSON on the Event); participant list with remove; exclusions via two dropdowns + add; "Run matching" button that works only once per event.
-- **Matching** (`core/matching.py`): no self, no reciprocal pairs, two-way exclusions (entered on the admin page).
+- **Matching** (`core/matching/`): no self, no reciprocal pairs, two-way exclusions (entered on the admin page).
   - Algorithm: shuffle-until-valid (rejection sampling) with an attempt cap — exactly uniform over valid assignments. Not greedy edge-picking (2021 approach: biased, dead-ends).
   - Feasibility, checked up front and live on the admin page: anyone with < 2 allowed people → impossible (name them); everyone allowed with ≥ n/2 others → guaranteed (Dirac). Couples-only with n ≥ 4 is always guaranteed. Otherwise shuffle and report "probably impossible" if the cap is hit.
   - Randomness: function takes an `rng`; tests pass a seeded one, production uses `random.SystemRandom`. No seed is stored or shown (it would reveal matches).
   - Assignment splits into loops (A→B→C→A) for the chain-style reveal.
-- **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB. In `core/db.py`, `get_giftee` is the only function that reads `matches` (a test enforces it) and `run_matching` returns only a count — never add a query that lists matches.
+- **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB. `core/db/matches.py:get_giftee` is the only function that reads `matches` (a test enforces it) and `run_matching` returns only a count — never add a query that lists matches.
 - "Your giftee" page: clues, budget
 - Stretch (only if v1 ships early): party reveal screen (big screen) with say-this/pose prompts: organiser clicks through pairs; guests submit guess-your-Santa guesses on their phones; scoring.
 - Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, themes, R2 backups, CI/GHCR + arm64 images
 
 ## Code conventions
-- **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `src/gift_exchange/migrations/` (SQL files, shipped with the package); `tests/` at repo root.
+- **Layout:** `src/gift_exchange/` package with `core/` (plain Python) and `ui/` (NiceGUI pages only). Each core component is a subpackage with one module per area, re-exporting its public API from `__init__.py` (callers use `from gift_exchange.core import db` → `db.join_event(...)`): `core/matching/`, `core/db/` (schema SQL in `core/db/migrations/`, shipped with the package); later `core/auth/`, `core/email/`. Tests mirror it under `tests/core/<component>/` (test file names must be unique across the tree).
 - **`src/sqlite_migrate/`** is a standalone package meant to become its own repo later: it must never import `gift_exchange` (a test enforces this), and its tests live in `tests/sqlite_migrate/`.
-- **DB access:** stdlib `sqlite3`; all queries in `core/db.py`, returning dataclasses. UI never writes SQL. Expected failures raise `DbError` subclasses (`NicknameTaken`, `EventClosed`, …) whose messages are safe to show users.
+- **DB access:** stdlib `sqlite3`; all queries in the `core/db/` package, returning dataclasses. UI never writes SQL. Expected failures raise `DbError` subclasses (`NicknameTaken`, `EventClosed`, …) whose messages are safe to show users.
 - **Types:** type hints everywhere; no type checker in v1.
 - **Docstrings:** Google style (`Args:` / `Returns:` / `Raises:`) on public functions and classes, explaining every parameter.
 - **Lint/format:** ruff (check + format).
@@ -51,7 +51,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
 
 ## Data model
-Schema: `src/gift_exchange/migrations/` (start at `0001_initial.sql`). Tables: users, events, participants, exclusions, matches. Later features add their own tables by migration (messages, guesses).
+Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). Tables: users, events, participants, exclusions, matches. Later features add their own tables by migration (messages, guesses).
 - Event status `open` → `matched` (final). After matching, the DB blocks joins, sign-up edits, exclusion changes and deleting matched participants (triggers + FKs).
 - Same-event integrity via composite FKs `(event_id, participant id)`; exclusions stored once per pair with `a_id < b_id`.
 - All tables `STRICT`; timestamps UTC ISO-8601 text; budget whole S$.

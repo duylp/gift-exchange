@@ -6,11 +6,11 @@ snapshots): `src/sqlite_migrate/README.md`.
 
 ## Where things are
 
-- SQL files: `src/gift_exchange/migrations/NNNN_name.sql` — inside the package so they ship
-  with it (e.g. in the Docker image). Path constant: `gift_exchange.core.db.MIGRATIONS_DIR`.
+- SQL files: `src/gift_exchange/core/db/migrations/NNNN_name.sql` — inside the package so
+  they ship with it (e.g. in the Docker image). Path constant: `gift_exchange.core.db.MIGRATIONS_DIR`.
 - Engine: `src/sqlite_migrate/` (standalone; must not import `gift_exchange`).
-- Tests: `tests/sqlite_migrate/` (engine), `tests/test_db.py` (the app's real migrations
-  apply cleanly and re-applying is a no-op).
+- Tests: `tests/sqlite_migrate/` (engine), `tests/core/db/test_schema.py` (the app's real
+  migrations apply cleanly, re-applying is a no-op, and the schema's constraints hold).
 
 ## When migrations run
 

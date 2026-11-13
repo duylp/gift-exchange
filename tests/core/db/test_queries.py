@@ -233,11 +233,13 @@ def test_get_giftee_for_non_participant_is_none(conn: sqlite3.Connection, event:
 
 
 def test_only_get_giftee_reads_matches() -> None:
-    # Secrecy guard: no other query in db.py may touch the matches table for reading.
-    import inspect
+    # Secrecy guard: no query in the db package except get_giftee may read the matches table.
+    import re
+    from pathlib import Path
 
-    source = inspect.getsource(q)
-    readers = [
-        line for line in source.splitlines() if "JOIN matches" in line or "FROM matches" in line
-    ]
-    assert readers == ["        JOIN matches AS m ON m.giver_id = me.id"]
+    readers = []
+    for path in sorted(Path(q.__file__).parent.glob("*.py")):
+        for line in path.read_text().splitlines():
+            if re.search(r"\b(FROM|JOIN)\s+matches\b", line):
+                readers.append((path.name, line.strip()))
+    assert readers == [("matches.py", "JOIN matches AS m ON m.giver_id = me.id")]
