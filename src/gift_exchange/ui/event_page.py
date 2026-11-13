@@ -88,9 +88,7 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         .props("outlined")
         .classes("w-full")
     )
-    ui.label("Only the organiser sees this (and everyone at the reveal).").classes(
-        "text-xs text-gray-500 -mt-2"
-    )
+    name.props["hint"] = "Only the organiser sees this (and everyone at the reveal)."
     nickname = (
         ui.input(
             "Nickname",
@@ -100,9 +98,7 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         .props("outlined")
         .classes("w-full")
     )
-    ui.label("Your Santa sees this instead of your name. Keep it a mystery! 🕵️").classes(
-        "text-xs text-gray-500 -mt-2"
-    )
+    nickname.props["hint"] = "Your Santa sees this instead of your name. Keep it a mystery! 🕵️"
 
     answers = []
     for section in event.sections:

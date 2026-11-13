@@ -83,7 +83,7 @@ def _new_event_form() -> None:
         .props(f'outlined prefix="{base}/e/"')
         .classes("w-full")
     )
-    ui.label("Lowercase letters, digits and hyphens.").classes("text-xs text-gray-500 -mt-2")
+    slug.props["hint"] = "Lowercase letters, digits and hyphens."
     title = (
         ui.input("Title", validation={"Required": lambda v: bool(v and v.strip())})
         .props("outlined")
@@ -194,7 +194,7 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
     budget = ui.number("Budget (S$)", value=event.budget, min=1, precision=0).props("outlined")
     if not event.is_open:
         budget.props("readonly")
-        ui.label("🔒 Budget is fixed after the draw.").classes("text-xs text-gray-500 -mt-2")
+        budget.props["hint"] = "🔒 Budget is fixed after the draw."
 
     questions_locked = has_people or not event.is_open
     if questions_locked:
