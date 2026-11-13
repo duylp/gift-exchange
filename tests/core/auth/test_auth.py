@@ -108,6 +108,10 @@ def test_is_admin() -> None:
         ("/\\evil.example", "/"),
         ("javascript:alert(1)", "/"),
         ("e/xmas", "/"),
+        ("/\t/evil.example", "/"),
+        ("/\n/evil.example", "/"),
+        ("/\r/evil.example", "/"),
+        ("/e/x\x7f", "/"),
     ],
 )
 def test_safe_next(given: str | None, expected: str) -> None:

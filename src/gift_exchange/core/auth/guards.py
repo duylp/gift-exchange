@@ -28,6 +28,10 @@ def safe_next(path: str | None) -> str:
     """
     if not path or not path.startswith("/") or path.startswith("//") or "\\" in path:
         return "/"
+    # Browsers drop tabs and newlines from URLs, so "/\t/evil.example" would become
+    # "//evil.example" (another site). Refuse any control character.
+    if any(c < " " or c == "\x7f" for c in path):
+        return "/"
     return path
 
 
