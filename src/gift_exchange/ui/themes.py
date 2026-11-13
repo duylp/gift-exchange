@@ -38,7 +38,7 @@ THEMES: dict[str, Theme] = {
     "plain": Theme("Plain"),
     "christmas": Theme(
         "Christmas 🎄",
-        colors={"primary": "#b91c1c", "secondary": "#166534", "accent": "#ca8a04"},
+        colors={"primary": "#15803d", "secondary": "#b91c1c", "accent": "#ca8a04"},
         header="🎄 Gift exchange 🎁",
         background="linear-gradient(180deg, #fdf2f2 0%, #f0f7f1 100%) fixed",
         title_font="Mountains of Christmas",
