@@ -48,11 +48,18 @@ def test_slug_taken(conn: sqlite3.Connection, event: q.Event) -> None:
 
 
 @pytest.mark.parametrize(
-    ("slug", "title", "budget"), [("Bad Slug", "T", 30), ("ok", "", 30), ("ok", "T", 0)]
+    ("slug", "title", "budget"),
+    [("Bad Slug", "T", 30), ("ok", "", 30), ("ok", "T", 0), ("ok", "T", 10**19)],
 )
 def test_invalid_event(conn: sqlite3.Connection, slug: str, title: str, budget: int) -> None:
     with pytest.raises(ValueError):
         q.create_event(conn, slug, title, budget, [])
+
+
+def test_update_event_budget_limit(conn: sqlite3.Connection, event: q.Event) -> None:
+    with pytest.raises(ValueError, match="budget"):
+        q.update_event(conn, event.id, "T", 10**19, None)
+    assert q.update_event(conn, event.id, "T", 10_000, None).budget == 10_000
 
 
 def test_event_not_found(conn: sqlite3.Connection) -> None:

@@ -15,6 +15,9 @@ from gift_exchange.core.db.models import (
     event_from_row,
 )
 
+MAX_BUDGET = 10_000
+"""Largest budget in whole S$ (a sanity limit, far above any real gift exchange)."""
+
 
 def create_event(
     conn: sqlite3.Connection,
@@ -30,7 +33,7 @@ def create_event(
         conn: Database connection.
         slug: URL part: lowercase letters, digits and hyphens, e.g. "xmas-2026".
         title: Display title.
-        budget: Gift budget in whole S$ (> 0).
+        budget: Gift budget in whole S$, 1 to `MAX_BUDGET`.
         sections: Clue question groups. Text is stripped; blank questions, and sections
             left with none, are dropped.
         theme: Look of the event page, one of `THEMES` (default `DEFAULT_THEME`).
@@ -43,6 +46,7 @@ def create_event(
         ValueError: If the slug, title, budget or theme is invalid.
     """
     require(title.strip(), "Title is required.")
+    _check_budget(budget)
     _check_theme(theme)
     try:
         cur = conn.execute(
@@ -122,7 +126,7 @@ def update_event(
         conn: Database connection.
         event_id: The event.
         title: New title.
-        budget: New budget in whole S$ (> 0).
+        budget: New budget in whole S$, 1 to `MAX_BUDGET`.
         sections: New sections (cleaned like `create_event`), or None to keep the
             current ones (always fine, even after people have signed up).
         theme: New theme, one of `THEMES`; None keeps the current one. Can always change.
@@ -138,6 +142,7 @@ def update_event(
         ValueError: If the title, budget or theme is invalid.
     """
     require(title.strip(), "Title is required.")
+    _check_budget(budget)
     if theme is not None:
         _check_theme(theme)
     questions = None if sections is None else encode_sections(clean_sections(sections))
@@ -170,6 +175,12 @@ def delete_event(conn: sqlite3.Connection, event_id: int) -> None:
         conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
     except sqlite3.IntegrityError as exc:
         raise EventClosed("A matched event can't be deleted.") from exc
+
+
+def _check_budget(budget: int) -> None:
+    # Also keeps huge numbers away from sqlite3 (OverflowError above 64-bit).
+    if not 1 <= budget <= MAX_BUDGET:
+        raise ValueError(f"The budget must be a whole number from 1 to {MAX_BUDGET:,}.")
 
 
 def _check_theme(theme: str) -> None:
