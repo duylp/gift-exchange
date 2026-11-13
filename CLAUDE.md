@@ -33,7 +33,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
   - Feasibility, checked up front and live on the admin page: anyone with < 2 allowed people → impossible (name them); everyone allowed with ≥ n/2 others → guaranteed (Dirac). Couples-only with n ≥ 4 is always guaranteed. Otherwise shuffle and report "probably impossible" if the cap is hit.
   - Randomness: function takes an `rng`; tests pass a seeded one, production uses `random.SystemRandom`. No seed is stored or shown (it would reveal matches).
   - Assignment splits into loops (A→B→C→A) for the chain-style reveal.
-- **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB — keep Match access behind one module so per-giver encryption can be added later.
+- **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB. In `core/db.py`, `get_giftee` is the only function that reads `matches` (a test enforces it) and `run_matching` returns only a count — never add a query that lists matches.
 - "Your giftee" page: clues, budget
 - Stretch (only if v1 ships early): party reveal screen (big screen) with say-this/pose prompts: organiser clicks through pairs; guests submit guess-your-Santa guesses on their phones; scoring.
 - Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, themes, R2 backups, CI/GHCR + arm64 images
@@ -41,12 +41,12 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 ## Code conventions
 - **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `src/gift_exchange/migrations/` (SQL files, shipped with the package); `tests/` at repo root.
 - **`src/sqlite_migrate/`** is a standalone package meant to become its own repo later: it must never import `gift_exchange` (a test enforces this), and its tests live in `tests/sqlite_migrate/`.
-- **DB access:** stdlib `sqlite3`; all queries in `core/` DB module(s), returning dataclasses. UI never writes SQL.
+- **DB access:** stdlib `sqlite3`; all queries in `core/db.py`, returning dataclasses. UI never writes SQL. Expected failures raise `DbError` subclasses (`NicknameTaken`, `EventClosed`, …) whose messages are safe to show users.
 - **Types:** type hints everywhere; no type checker in v1.
 - **Docstrings:** Google style (`Args:` / `Returns:` / `Raises:`) on public functions and classes, explaining every parameter.
 - **Lint/format:** ruff (check + format).
 - **Tests:** pytest for core only (matching, migrations, DB queries, auth tokens). UI is checked by hand.
-- **Run:** `cp .env.example .env` (set `SECRET_KEY`), then `uv run python -m gift_exchange.main` — auto-reloads when `DEV=1`. Same command in Docker. No console-script entry point (breaks NiceGUI reload). Docker is for deployment only.
+- **Run:** `cp .env.example .env` (set `SECRET_KEY`), then `uv run python -m gift_exchange.main` — auto-reloads when `DEV=1`. Sample data: `uv run python -m gift_exchange.seed` (DEV only; event `xmas-2026`, 8 fake people). Same command in Docker. No console-script entry point (breaks NiceGUI reload). Docker is for deployment only.
 - **Check before commit:** `uv run ruff format . && uv run ruff check . && uv run pytest`
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
 
