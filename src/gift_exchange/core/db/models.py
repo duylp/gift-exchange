@@ -5,6 +5,9 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+THEMES = ("plain", "christmas")
+"""Theme names an event can use (each is styled in `ui/themes.py`); the first is the default."""
+
 
 @dataclass(frozen=True)
 class Section:
@@ -34,6 +37,7 @@ class Event:
         sections: Clue question groups asked at sign-up, in order.
         status: "open" (sign-ups open) or "matched" (final).
         matched_at: UTC ISO-8601 time matching ran, or None.
+        theme: Look of the event page, one of `THEMES`.
     """
 
     id: int
@@ -43,6 +47,7 @@ class Event:
     sections: tuple[Section, ...]
     status: str
     matched_at: str | None
+    theme: str = THEMES[0]
 
     @property
     def is_open(self) -> bool:
@@ -105,6 +110,7 @@ def event_from_row(row: sqlite3.Row) -> Event:
         sections=decode_sections(row["questions"]),
         status=row["status"],
         matched_at=row["matched_at"],
+        theme=row["theme"],
     )
 
 

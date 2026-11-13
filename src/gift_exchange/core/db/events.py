@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from gift_exchange.core.db._util import require
 from gift_exchange.core.db.errors import EventClosed, NotFound, QuestionsLocked, SlugTaken
 from gift_exchange.core.db.models import (
+    THEMES,
     Event,
     Section,
     clean_sections,
@@ -15,7 +16,12 @@ from gift_exchange.core.db.models import (
 
 
 def create_event(
-    conn: sqlite3.Connection, slug: str, title: str, budget: int, sections: Sequence[Section]
+    conn: sqlite3.Connection,
+    slug: str,
+    title: str,
+    budget: int,
+    sections: Sequence[Section],
+    theme: str = THEMES[0],
 ) -> Event:
     """Create an event, open for sign-ups.
 
@@ -26,19 +32,21 @@ def create_event(
         budget: Gift budget in whole S$ (> 0).
         sections: Clue question groups. Text is stripped; blank questions, and sections
             left with none, are dropped.
+        theme: Look of the event page, one of `THEMES` (default "plain").
 
     Returns:
         The new event.
 
     Raises:
         SlugTaken: If another event already uses `slug`.
-        ValueError: If the slug, title or budget is invalid.
+        ValueError: If the slug, title, budget or theme is invalid.
     """
     require(title.strip(), "Title is required.")
+    _check_theme(theme)
     try:
         cur = conn.execute(
-            "INSERT INTO events (slug, title, budget, questions) VALUES (?, ?, ?, ?)",
-            (slug, title.strip(), budget, encode_sections(clean_sections(sections))),
+            "INSERT INTO events (slug, title, budget, questions, theme) VALUES (?, ?, ?, ?, ?)",
+            (slug, title.strip(), budget, encode_sections(clean_sections(sections)), theme),
         )
     except sqlite3.IntegrityError as exc:
         if "UNIQUE" in str(exc):
@@ -105,8 +113,9 @@ def update_event(
     title: str,
     budget: int,
     sections: Sequence[Section],
+    theme: str | None = None,
 ) -> Event:
-    """Change an event's title, budget and clue question sections.
+    """Change an event's title, budget, clue question sections and theme.
 
     Args:
         conn: Database connection.
@@ -115,6 +124,7 @@ def update_event(
         budget: New budget in whole S$ (> 0).
         sections: New sections (cleaned like `create_event`). Passing the current
             sections unchanged is always fine, even after people have signed up.
+        theme: New theme, one of `THEMES`; None keeps the current one. Can always change.
 
     Returns:
         The updated event.
@@ -124,13 +134,16 @@ def update_event(
         EventClosed: If the budget differs and the event has been matched (Santas may
             already have bought gifts). The title can always change.
         NotFound: If there is no such event.
-        ValueError: If the title or budget is invalid.
+        ValueError: If the title, budget or theme is invalid.
     """
     require(title.strip(), "Title is required.")
+    if theme is not None:
+        _check_theme(theme)
     try:
         cur = conn.execute(
-            "UPDATE events SET title = ?, budget = ?, questions = ? WHERE id = ?",
-            (title.strip(), budget, encode_sections(clean_sections(sections)), event_id),
+            "UPDATE events SET title = ?, budget = ?, questions = ?, theme = COALESCE(?, theme) "
+            "WHERE id = ?",
+            (title.strip(), budget, encode_sections(clean_sections(sections)), theme, event_id),
         )
     except sqlite3.IntegrityError as exc:
         if "locked" in str(exc):
@@ -155,3 +168,8 @@ def delete_event(conn: sqlite3.Connection, event_id: int) -> None:
         conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
     except sqlite3.IntegrityError as exc:
         raise EventClosed("A matched event can't be deleted.") from exc
+
+
+def _check_theme(theme: str) -> None:
+    if theme not in THEMES:
+        raise ValueError(f"Unknown theme '{theme}'.")

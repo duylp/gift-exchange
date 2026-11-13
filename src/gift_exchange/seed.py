@@ -65,7 +65,7 @@ def main() -> int:
         except db.NotFound:
             pass
 
-        event = db.create_event(conn, SLUG, "Christmas 2026 🎄", 30, SECTIONS)
+        event = db.create_event(conn, SLUG, "Christmas 2026 🎄", 30, SECTIONS, theme="christmas")
         try:
             ids = {}
             for name, nickname, answers in PEOPLE:

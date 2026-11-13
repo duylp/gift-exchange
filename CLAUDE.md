@@ -22,7 +22,8 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
   - Pages take `request: Request` and call `ui/session.py:current_email(request)` while building; per-page checks (not middleware) because event pages are partly public. Admin = email in `ADMIN_EMAILS`. Rotating `SECRET_KEY` logs everyone out.
   - Do not use NiceGUI `app.storage.user`.
 - **Email:** `httpx` POST to the Resend API (no SDK); must send a `User-Agent` header (Resend returns 403 without one). Dev backend (`DEV=1`) prints emails, including login links, to the terminal.
-- **Multi-event:** the app is occasion-agnostic; an event has just a slug, title and budget (no themes/branding in v1).
+- **Multi-event:** the app is occasion-agnostic; an event has a slug, title, budget and theme.
+- **Themes:** per event, chosen from presets in code (`db.THEMES` names: `plain`, `christmas`; styles in `ui/themes.py`). Stored as `events.theme` (no CHECK — a new theme is a code change, no migration; core validates on write, UI falls back to `plain`). Editable after matching. Only `/e/<slug>` uses the event's theme; home, login and admin pages are `plain`. No custom colours/CSS from the admin.
 
 ## v1 scope
 - **Organiser:** the repo owner hosts all events. Single admin, identified by email from an env var (`ADMIN_EMAILS`); no per-event organiser roles in v1.
@@ -43,7 +44,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Home page** `/` (`ui/pages.py`): logged out → welcome + login form; logged in → "🎄 Your exchanges" (events this email joined, via `db.list_events_joined_by`, as clickable cards), then for admins a separate "🛠️ Organiser" section (divider, heading, **Manage events** button to `/admin`). Never lists events the person hasn't joined.
 - **Event page** `/e/<slug>` (`ui/event_page.py`): one page, state worked out from the DB on every load — not logged in (login form) / sign-up form / "you're in" with edit (`?edit=true`) / your giftee (nickname, clues, budget) / closed. Shows only a participant count publicly, plus a "How it works" block of the rules built from the event (budget, hidden sections), always shown. After any change it navigates to itself (no UI-only state).
 - Stretch (only if v1 ships early): party reveal screen (big screen) with say-this/pose prompts: organiser clicks through pairs; guests submit guess-your-Santa guesses on their phones; scoring.
-- Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, themes, R2 backups, CI/GHCR + arm64 images
+- Later: anonymous Santa↔giftee chat, voting, wishlist, copy questions from a previous event, auto last-year exclusions, more theme presets, R2 backups, CI/GHCR + arm64 images
 
 ## Code conventions
 - **Layout:** `src/gift_exchange/` package with `core/` (plain Python) and `ui/` (NiceGUI pages only). Each core component is a subpackage with one module per area, re-exporting its public API from `__init__.py` (callers use `from gift_exchange.core import db` → `db.join_event(...)`): `core/matching/`, `core/db/` (schema SQL in `core/db/migrations/`, shipped with the package), `core/auth/`, `core/email/`. Tests mirror it under `tests/core/<component>/` (test file names must be unique across the tree).

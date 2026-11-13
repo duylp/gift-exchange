@@ -73,6 +73,18 @@ def test_update_event_questions_locked_after_signup(
         q.update_event(conn, event.id, "Newer", 50, [q.Section("", ("Changed?", "Two?"))])
 
 
+def test_event_theme(conn: sqlite3.Connection, event: q.Event) -> None:
+    assert event.theme == "plain"
+    e = q.create_event(conn, "xmas-2027", "Xmas 2027", 30, [], theme="christmas")
+    assert e.theme == "christmas"
+    assert q.update_event(conn, e.id, "Xmas", 30, []).theme == "christmas"  # None keeps it
+    assert q.update_event(conn, e.id, "Xmas", 30, [], theme="plain").theme == "plain"
+    with pytest.raises(ValueError, match="theme"):
+        q.create_event(conn, "bad", "Bad", 30, [], theme="nope")
+    with pytest.raises(ValueError, match="theme"):
+        q.update_event(conn, e.id, "Xmas", 30, [], theme="nope")
+
+
 # --- sign-ups --------------------------------------------------------------------------
 
 
@@ -254,8 +266,8 @@ def test_budget_fixed_after_match_but_title_editable(
     q.run_matching(conn, event.id)
     with pytest.raises(q.EventClosed, match="budget"):
         q.update_event(conn, event.id, event.title, 999, QUESTIONS)
-    renamed = q.update_event(conn, event.id, "Renamed", event.budget, QUESTIONS)
-    assert (renamed.title, renamed.budget) == ("Renamed", 30)
+    renamed = q.update_event(conn, event.id, "Renamed", event.budget, QUESTIONS, "christmas")
+    assert (renamed.title, renamed.budget, renamed.theme) == ("Renamed", 30, "christmas")
 
 
 def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
