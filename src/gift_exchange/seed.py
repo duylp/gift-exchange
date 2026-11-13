@@ -55,8 +55,7 @@ def main() -> int:
             ids = {}
             for name, nickname, answers in PEOPLE:
                 email = name.lower().replace(" ", ".") + "@example.com"
-                user = db.get_or_create_user(conn, email)
-                ids[name] = db.join_event(conn, event.id, user.id, name, nickname, answers).id
+                ids[name] = db.join_event(conn, event.id, email, name, nickname, answers).id
             db.add_exclusion(conn, event.id, ids[COUPLE[0]], ids[COUPLE[1]])
         except BaseException:
             db.delete_event(conn, event.id)  # all-or-nothing: next run starts clean

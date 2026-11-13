@@ -4,7 +4,7 @@ All SQL lives in this package; the UI calls these functions. Import the package 
 its names (`from gift_exchange.core import db; db.join_event(...)`).
 
 Modules: `connection` (connect, transactions, migrations folder), `errors`, `models`,
-`users`, `events`, `signups`, `exclusions`, `matches`. The schema is in `migrations/`.
+`events`, `signups`, `exclusions`, `matches`. The schema is in `migrations/`.
 
 Match secrecy: `matches.get_giftee` is the only function that reads the `matches` table.
 """
@@ -29,7 +29,7 @@ from gift_exchange.core.db.events import (
 )
 from gift_exchange.core.db.exclusions import add_exclusion, list_exclusions, remove_exclusion
 from gift_exchange.core.db.matches import event_feasibility, get_giftee, run_matching
-from gift_exchange.core.db.models import Event, Giftee, Participant, User
+from gift_exchange.core.db.models import Event, Giftee, Participant
 from gift_exchange.core.db.signups import (
     get_participant,
     join_event,
@@ -37,7 +37,6 @@ from gift_exchange.core.db.signups import (
     remove_participant,
     update_signup,
 )
-from gift_exchange.core.db.users import get_or_create_user, get_user
 
 __all__ = [
     "MIGRATIONS_DIR",
@@ -51,7 +50,6 @@ __all__ = [
     "Participant",
     "QuestionsLocked",
     "SlugTaken",
-    "User",
     "add_exclusion",
     "connect",
     "create_event",
@@ -60,9 +58,7 @@ __all__ = [
     "get_event",
     "get_event_by_slug",
     "get_giftee",
-    "get_or_create_user",
     "get_participant",
-    "get_user",
     "join_event",
     "list_events",
     "list_exclusions",

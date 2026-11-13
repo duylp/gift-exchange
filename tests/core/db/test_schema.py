@@ -23,10 +23,6 @@ def db() -> sqlite3.Connection:
     return conn
 
 
-def add_user(db: sqlite3.Connection, email: str) -> int:
-    return db.execute("INSERT INTO users (email) VALUES (?)", (email,)).lastrowid
-
-
 def add_event(db: sqlite3.Connection, slug: str = "xmas-2026", questions: str = '["Q1?"]') -> int:
     return db.execute(
         "INSERT INTO events (slug, title, budget, questions) VALUES (?, 'Xmas', 30, ?)",
@@ -34,16 +30,17 @@ def add_event(db: sqlite3.Connection, slug: str = "xmas-2026", questions: str = 
     ).lastrowid
 
 
-def join(db: sqlite3.Connection, event_id: int, user_id: int, nickname: str) -> int:
+def join(db: sqlite3.Connection, event_id: int, email: str, nickname: str) -> int:
     return db.execute(
-        "INSERT INTO participants (event_id, user_id, nickname, answers) VALUES (?, ?, ?, ?)",
-        (event_id, user_id, nickname, '["A"]'),
+        "INSERT INTO participants (event_id, email, name, nickname, answers) "
+        "VALUES (?, ?, 'Name', ?, ?)",
+        (event_id, email, nickname, '["A"]'),
     ).lastrowid
 
 
 def setup_three(db: sqlite3.Connection) -> tuple[int, list[int]]:
     event = add_event(db)
-    people = [join(db, event, add_user(db, f"{n}@x.com"), n) for n in ("ann", "bob", "cat")]
+    people = [join(db, event, f"{n}@x.com", n) for n in ("ann", "bob", "cat")]
     return event, people
 
 
@@ -56,10 +53,12 @@ def match(db: sqlite3.Connection, event: int, people: list[int]) -> None:
     db.execute("UPDATE events SET status = 'matched' WHERE id = ?", (event,))
 
 
-def test_email_unique_case_insensitive(db: sqlite3.Connection) -> None:
-    add_user(db, "Ann@X.com")
+def test_email_joins_once_per_event_case_insensitive(db: sqlite3.Connection) -> None:
+    event, other = add_event(db), add_event(db, "other")
+    join(db, event, "Ann@X.com", "a")
     with pytest.raises(sqlite3.IntegrityError):
-        add_user(db, "ann@x.com")
+        join(db, event, "ann@x.com", "b")
+    join(db, other, "ann@x.com", "a")  # same person, another event: fine
 
 
 @pytest.mark.parametrize("slug", ["Xmas", "-xmas", "xmas 2026", "xmas_2026", ""])
@@ -83,14 +82,11 @@ def test_questions_must_be_json_array(db: sqlite3.Connection) -> None:
         add_event(db, questions='{"q": 1}')
 
 
-def test_join_once_and_unique_nickname(db: sqlite3.Connection) -> None:
+def test_unique_nickname_per_event(db: sqlite3.Connection) -> None:
     event = add_event(db)
-    u1, u2 = add_user(db, "a@x.com"), add_user(db, "b@x.com")
-    join(db, event, u1, "Rudolph")
+    join(db, event, "a@x.com", "Rudolph")
     with pytest.raises(sqlite3.IntegrityError):
-        join(db, event, u1, "Other")
-    with pytest.raises(sqlite3.IntegrityError):
-        join(db, event, u2, "rudolph")
+        join(db, event, "b@x.com", "rudolph")
 
 
 def test_exclusion_pair_ordered_and_same_event(db: sqlite3.Connection) -> None:
@@ -98,7 +94,7 @@ def test_exclusion_pair_ordered_and_same_event(db: sqlite3.Connection) -> None:
     with pytest.raises(sqlite3.IntegrityError):
         db.execute("INSERT INTO exclusions VALUES (?, ?, ?)", (event, b, a))  # not a < b
     other = add_event(db, "other")
-    x = join(db, other, add_user(db, "x@x.com"), "x")
+    x = join(db, other, "x@x.com", "x")
     with pytest.raises(sqlite3.IntegrityError):
         db.execute("INSERT INTO exclusions VALUES (?, ?, ?)", (event, a, x))  # cross-event
 
@@ -120,7 +116,7 @@ def test_matched_participant_cannot_be_deleted(db: sqlite3.Connection) -> None:
 def test_questions_locked_after_first_signup(db: sqlite3.Connection) -> None:
     event = add_event(db)
     db.execute("UPDATE events SET questions = '[\"New?\"]' WHERE id = ?", (event,))  # ok
-    join(db, event, add_user(db, "a@x.com"), "a")
+    join(db, event, "a@x.com", "a")
     with pytest.raises(sqlite3.IntegrityError, match="locked"):
         db.execute("UPDATE events SET questions = '[\"Other?\"]' WHERE id = ?", (event,))
     db.execute("UPDATE events SET title = 'Renamed' WHERE id = ?", (event,))  # other fields ok
@@ -133,7 +129,7 @@ def test_signup_editable_until_matched(db: sqlite3.Connection) -> None:
     with pytest.raises(sqlite3.IntegrityError, match="closed"):
         db.execute("UPDATE participants SET nickname = 'Ann3' WHERE id = ?", (people[0],))
     with pytest.raises(sqlite3.IntegrityError, match="closed"):
-        join(db, event, add_user(db, "late@x.com"), "late")
+        join(db, event, "late@x.com", "late")
 
 
 def test_exclusions_fixed_after_match(db: sqlite3.Connection) -> None:

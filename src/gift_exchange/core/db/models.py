@@ -6,21 +6,6 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class User:
-    """A person, identified by email, across all events.
-
-    Attributes:
-        id: Row ID.
-        email: Lowercased email address.
-        name: Real name, or None until their first sign-up.
-    """
-
-    id: int
-    email: str
-    name: str | None
-
-
-@dataclass(frozen=True)
 class Event:
     """A gift exchange.
 
@@ -49,23 +34,21 @@ class Event:
 
 @dataclass(frozen=True)
 class Participant:
-    """A user's sign-up for one event.
+    """A person's sign-up for one event.
 
     Attributes:
         id: Row ID (the ID used for exclusions and matching).
         event_id: The event.
-        user_id: The user.
-        name: The user's real name (organiser / reveal only).
-        email: The user's email (organiser only).
+        email: Lowercased email; identifies the person (they log in with it).
+        name: Real name (organiser view and reveal only).
         nickname: Anonymous name shown to their Santa.
         answers: Answers in the same order as the event's questions.
     """
 
     id: int
     event_id: int
-    user_id: int
-    name: str
     email: str
+    name: str
     nickname: str
     answers: tuple[str, ...]
 
@@ -86,8 +69,7 @@ class Giftee:
 
 
 PARTICIPANT_SELECT = """
-    SELECT p.id, p.event_id, p.user_id, u.name, u.email, p.nickname, p.answers
-    FROM participants AS p JOIN users AS u ON u.id = p.user_id
+    SELECT p.id, p.event_id, p.email, p.name, p.nickname, p.answers FROM participants AS p
 """
 
 
@@ -107,9 +89,8 @@ def participant_from_row(row: sqlite3.Row) -> Participant:
     return Participant(
         id=row["id"],
         event_id=row["event_id"],
-        user_id=row["user_id"],
-        name=row["name"] or "",
         email=row["email"],
+        name=row["name"],
         nickname=row["nickname"],
         answers=tuple(json.loads(row["answers"])),
     )

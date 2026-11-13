@@ -16,16 +16,16 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
 - **Migrations:** own minimal engine `sqlite_migrate` — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. App usage: `docs/migrations.md`; engine design: `src/sqlite_migrate/README.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
-- **Auth:** magic link (itsdangerous) → long-lived signed session cookie (~60 days). A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding `user_id`; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
+- **Auth:** magic link (itsdangerous) → long-lived signed session cookie (~60 days). A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding the person's email; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
 - **Email:** `httpx` POST to the Resend API (no SDK). Dev backend prints the link to the console.
 - **Multi-event:** the app is occasion-agnostic; an event has just a slug, title and budget (no themes/branding in v1).
 
 ## v1 scope
 - **Organiser:** the repo owner hosts all events. Single admin, identified by email from an env var (`ADMIN_EMAILS`); no per-event organiser roles in v1.
-- **Identity:** one account per email (User) across events; a Participant row per user per event. (Deferred: deriving "last year's match" exclusions automatically — no previous event exists yet.)
+- **Identity:** no accounts / users table. A person is their email: logging in proves it, and each event has one participant row per email (with real name, nickname, answers). Cross-event features (avoid last year's match, carry couples over, invite past participants) match on email; add a users table by migration only if a per-person feature ever needs it.
 - **Joining:** anyone with the event link `/e/<slug>` can sign up; organiser can remove people before matching.
 - **Budget:** one fixed amount per event, set by the organiser.
-- Sign-up: real name (on the user, shown to the organiser and at the reveal; prefilled next time), anonymous nickname (per event, shown to their Santa), answers to the event's clue questions. Editable until the event is matched.
+- Sign-up: real name (shown to the organiser and at the reveal), anonymous nickname (per event, shown to their Santa), answers to the event's clue questions. Editable until the event is matched.
 - **Questions are locked** once anyone has signed up (DB trigger); answers are stored in question order.
 - **Admin page** (one plain page, admin only): create event (slug, title, budget); clue questions as a textarea, one per line (stored as JSON on the Event); participant list with remove; exclusions via two dropdowns + add; "Run matching" button that works only once per event.
 - **Matching** (`core/matching/`): no self, no reciprocal pairs, two-way exclusions (entered on the admin page).
@@ -51,7 +51,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
 
 ## Data model
-Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). Tables: users, events, participants, exclusions, matches. Later features add their own tables by migration (messages, guesses).
+Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). Tables: events, participants, exclusions, matches (no users table — see **Identity**). Later features add their own tables by migration (messages, guesses).
 - Event status `open` → `matched` (final). After matching, the DB blocks joins, sign-up edits, exclusion changes, budget changes, and deleting matched participants or the event (triggers + FKs). The title stays editable.
 - Same-event integrity via composite FKs `(event_id, participant id)`; exclusions stored once per pair with `a_id < b_id`.
 - All tables `STRICT`; timestamps UTC ISO-8601 text; budget whole S$.

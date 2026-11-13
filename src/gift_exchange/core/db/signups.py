@@ -1,9 +1,13 @@
-"""Sign-ups: joining an event, editing, listing and removing participants."""
+"""Sign-ups: joining an event, editing, listing and removing participants.
+
+A person is identified by their email within each event (there is no users table); the
+email comes from the signed login cookie, never from a form field.
+"""
 
 import sqlite3
 from collections.abc import Sequence
 
-from gift_exchange.core.db._util import encode_list, require
+from gift_exchange.core.db._util import encode_list, normalize_email, require
 from gift_exchange.core.db.connection import transaction
 from gift_exchange.core.db.errors import (
     AlreadyJoined,
@@ -24,18 +28,19 @@ from gift_exchange.core.db.models import (
 def join_event(
     conn: sqlite3.Connection,
     event_id: int,
-    user_id: int,
+    email: str,
     name: str,
     nickname: str,
     answers: Sequence[str],
 ) -> Participant:
-    """Sign a user up for an event, saving their real name on their user record.
+    """Sign a person up for an event.
 
     Args:
         conn: Database connection.
         event_id: The event to join.
-        user_id: The signed-in user.
-        name: Their real name (required; updates the user record for future events).
+        email: The signed-in person's email (from the session). Case and surrounding
+            spaces are ignored.
+        name: Their real name (required).
         nickname: Anonymous name shown to their Santa (required, unique in the event).
         answers: One answer per event question, in order.
 
@@ -43,22 +48,23 @@ def join_event(
         The new participant.
 
     Raises:
-        AlreadyJoined: If the user has already joined this event.
+        AlreadyJoined: If this email has already joined the event.
         NicknameTaken: If the nickname is in use in this event.
         EventClosed: If the event has been matched.
-        NotFound: If the event or user doesn't exist.
-        ValueError: If the name or nickname is blank, or the number of answers is wrong.
+        NotFound: If the event doesn't exist.
+        ValueError: If the email is invalid, the name or nickname is blank, or the number
+            of answers is wrong.
     """
+    email = normalize_email(email)
     try:
         with transaction(conn):
             # Validate inside the transaction so the questions can't change under us.
             event = get_event(conn, event_id)
             name, nickname, answers = check_signup(event, name, nickname, answers)
-            conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
             cur = conn.execute(
-                "INSERT INTO participants (event_id, user_id, nickname, answers) "
-                "VALUES (?, ?, ?, ?)",
-                (event_id, user_id, nickname, encode_list(answers)),
+                "INSERT INTO participants (event_id, email, name, nickname, answers) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (event_id, email, name, nickname, encode_list(answers)),
             )
     except sqlite3.IntegrityError as exc:
         raise signup_error(exc) from exc
@@ -68,44 +74,50 @@ def join_event(
 def update_signup(
     conn: sqlite3.Connection,
     event_id: int,
-    user_id: int,
+    email: str,
     name: str,
     nickname: str,
     answers: Sequence[str],
 ) -> Participant:
-    """Change a user's sign-up (allowed until the event is matched).
+    """Change a person's sign-up (allowed until the event is matched).
 
-    Args and Raises: as `join_event`, except it raises `NotFound` if the user hasn't
+    Args and Raises: as `join_event`, except it raises `NotFound` if this email hasn't
     joined, instead of `AlreadyJoined`.
 
     Returns:
         The updated participant.
     """
+    email = normalize_email(email)
     try:
         with transaction(conn):
             event = get_event(conn, event_id)
             name, nickname, answers = check_signup(event, name, nickname, answers)
-            conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
             cur = conn.execute(
-                "UPDATE participants SET nickname = ?, answers = ? "
-                "WHERE event_id = ? AND user_id = ?",
-                (nickname, encode_list(answers), event_id, user_id),
+                "UPDATE participants SET name = ?, nickname = ?, answers = ? "
+                "WHERE event_id = ? AND email = ?",
+                (name, nickname, encode_list(answers), event_id, email),
             )
             if cur.rowcount == 0:
                 raise NotFound("You haven't joined this event.")
     except sqlite3.IntegrityError as exc:
         raise signup_error(exc) from exc
-    return get_participant(conn, event_id, user_id)
+    return get_participant(conn, event_id, email)
 
 
-def get_participant(conn: sqlite3.Connection, event_id: int, user_id: int) -> Participant:
-    """A user's sign-up for an event.
+def get_participant(conn: sqlite3.Connection, event_id: int, email: str) -> Participant:
+    """A person's sign-up for an event.
+
+    Args:
+        conn: Database connection.
+        event_id: The event.
+        email: The person's email (case and surrounding spaces are ignored).
 
     Raises:
-        NotFound: If the user hasn't joined the event.
+        NotFound: If this email hasn't joined the event.
     """
     row = conn.execute(
-        f"{PARTICIPANT_SELECT} WHERE p.event_id = ? AND p.user_id = ?", (event_id, user_id)
+        f"{PARTICIPANT_SELECT} WHERE p.event_id = ? AND p.email = ?",
+        (event_id, email.strip().lower()),
     ).fetchone()
     if row is None:
         raise NotFound("You haven't joined this event.")
@@ -152,8 +164,6 @@ def signup_error(exc: sqlite3.IntegrityError) -> DbError:
         return EventClosed("Sign-ups are closed: this event has been matched.")
     if "participants.nickname" in message:
         return NicknameTaken("That nickname is taken in this event; pick another.")
-    if "participants.user_id" in message:
+    if "participants.email" in message:
         return AlreadyJoined("You've already joined this event.")
-    if "FOREIGN KEY" in message:  # unknown user_id, e.g. a stale session cookie
-        return NotFound("Your account wasn't found; please log in again.")
     raise exc

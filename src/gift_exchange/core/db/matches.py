@@ -64,17 +64,18 @@ def run_matching(conn: sqlite3.Connection, event_id: int, rng: random.Random | N
     return len(assignment)
 
 
-def get_giftee(conn: sqlite3.Connection, event_id: int, user_id: int) -> Giftee | None:
-    """Who this user gives a gift to. The only function that reads matches.
+def get_giftee(conn: sqlite3.Connection, event_id: int, email: str) -> Giftee | None:
+    """Who this person gives a gift to. The only function that reads matches.
 
     Args:
         conn: Database connection.
         event_id: The event.
-        user_id: The signed-in user asking about their own giftee.
+        email: The signed-in person's email (from the session), asking about their own
+            giftee. Case and surrounding spaces are ignored.
 
     Returns:
         The giftee's nickname, clues and the budget; or None if the event isn't matched
-        yet or the user isn't in it.
+        yet or this email isn't in it.
     """
     row = conn.execute(
         """
@@ -83,9 +84,9 @@ def get_giftee(conn: sqlite3.Connection, event_id: int, user_id: int) -> Giftee 
         JOIN matches AS m ON m.giver_id = me.id
         JOIN participants AS g ON g.id = m.giftee_id
         JOIN events AS e ON e.id = me.event_id
-        WHERE me.event_id = ? AND me.user_id = ?
+        WHERE me.event_id = ? AND me.email = ?
         """,
-        (event_id, user_id),
+        (event_id, email.strip().lower()),
     ).fetchone()
     if row is None:
         return None

@@ -23,28 +23,9 @@ def event(conn: sqlite3.Connection) -> q.Event:
 
 
 def signup(conn: sqlite3.Connection, event: q.Event, who: str) -> q.Participant:
-    user = q.get_or_create_user(conn, f"{who}@example.com")
-    return q.join_event(conn, event.id, user.id, who.title(), f"{who}-nick", ["a", "b"])
-
-
-# --- users ------------------------------------------------------------------------------
-
-
-def test_get_or_create_user_normalises_and_is_idempotent(conn: sqlite3.Connection) -> None:
-    u1 = q.get_or_create_user(conn, "  Ann@Example.COM ")
-    u2 = q.get_or_create_user(conn, "ann@example.com")
-    assert u1 == u2 and u1.email == "ann@example.com" and u1.name is None
-    assert q.get_user(conn, u1.id) == u1
-
-
-def test_invalid_email(conn: sqlite3.Connection) -> None:
-    with pytest.raises(ValueError):
-        q.get_or_create_user(conn, "not-an-email")
-
-
-def test_get_user_missing(conn: sqlite3.Connection) -> None:
-    with pytest.raises(q.NotFound):
-        q.get_user(conn, 999)
+    return q.join_event(
+        conn, event.id, f"{who}@example.com", who.title(), f"{who}-nick", ["a", "b"]
+    )
 
 
 # --- events -----------------------------------------------------------------------------
@@ -92,45 +73,46 @@ def test_update_event_questions_locked_after_signup(
 # --- sign-ups --------------------------------------------------------------------------
 
 
-def test_join_sets_user_name_and_returns_participant(
-    conn: sqlite3.Connection, event: q.Event
-) -> None:
-    user = q.get_or_create_user(conn, "ann@example.com")
-    p = q.join_event(conn, event.id, user.id, " Ann Tan ", " Rudolph ", [" ski ", "red"])
+def test_join_normalises_and_returns_participant(conn: sqlite3.Connection, event: q.Event) -> None:
+    p = q.join_event(
+        conn, event.id, " Ann@Example.COM ", " Ann Tan ", " Rudolph ", [" ski ", "red"]
+    )
     assert (p.name, p.nickname, p.answers, p.email) == (
         "Ann Tan",
         "Rudolph",
         ("ski", "red"),
         "ann@example.com",
     )
-    assert q.get_user(conn, user.id).name == "Ann Tan"
-    assert q.get_participant(conn, event.id, user.id) == p
+    assert q.get_participant(conn, event.id, "ANN@example.com") == p
 
 
 def test_join_errors(conn: sqlite3.Connection, event: q.Event) -> None:
     ann = signup(conn, event, "ann")
-    bob = q.get_or_create_user(conn, "bob@example.com")
+    bob = "bob@example.com"
     with pytest.raises(q.AlreadyJoined):
-        q.join_event(conn, event.id, ann.user_id, "Ann", "other", ["a", "b"])
+        q.join_event(conn, event.id, "ANN@example.com", "Ann", "other", ["a", "b"])
     with pytest.raises(q.NicknameTaken):
-        q.join_event(conn, event.id, bob.id, "Bob", "ANN-NICK", ["a", "b"])
+        q.join_event(conn, event.id, bob, "Bob", "ANN-NICK", ["a", "b"])
     with pytest.raises(ValueError, match="answers"):
-        q.join_event(conn, event.id, bob.id, "Bob", "bob", ["only one"])
+        q.join_event(conn, event.id, bob, "Bob", "bob", ["only one"])
     with pytest.raises(ValueError, match="name"):
-        q.join_event(conn, event.id, bob.id, "  ", "bob", ["a", "b"])
+        q.join_event(conn, event.id, bob, "  ", "bob", ["a", "b"])
+    with pytest.raises(ValueError, match="email"):
+        q.join_event(conn, event.id, "not-an-email", "Bob", "bob", ["a", "b"])
+    with pytest.raises(q.NotFound):
+        q.join_event(conn, 999, bob, "Bob", "bob", ["a", "b"])
     # Failed joins changed nothing.
-    assert q.get_user(conn, bob.id).name is None
-    assert len(q.list_participants(conn, event.id)) == 1
+    assert [p.id for p in q.list_participants(conn, event.id)] == [ann.id]
+    assert not conn.in_transaction
 
 
 def test_update_signup(conn: sqlite3.Connection, event: q.Event) -> None:
     ann = signup(conn, event, "ann")
-    p = q.update_signup(conn, event.id, ann.user_id, "Ann T", "Comet", ["x", "y"])
-    assert (p.name, p.nickname, p.answers) == ("Ann T", "Comet", ("x", "y"))
-    stranger = q.get_or_create_user(conn, "zed@example.com")
+    p = q.update_signup(conn, event.id, ann.email, "Ann T", "Comet", ["x", "y"])
+    assert (p.id, p.name, p.nickname, p.answers) == (ann.id, "Ann T", "Comet", ("x", "y"))
     with pytest.raises(q.NotFound):
-        q.update_signup(conn, event.id, stranger.id, "Zed", "zed", ["a", "b"])
-    assert q.get_user(conn, stranger.id).name is None  # rolled back
+        q.update_signup(conn, event.id, "zed@example.com", "Zed", "zed", ["a", "b"])
+    assert not conn.in_transaction
 
 
 def test_remove_participant(conn: sqlite3.Connection, event: q.Event) -> None:
@@ -178,7 +160,7 @@ def test_full_flow(conn: sqlite3.Connection, event: q.Event) -> None:
     people = [signup(conn, event, n) for n in ("ann", "bob", "cat", "dan", "eve", "fay")]
     q.add_exclusion(conn, event.id, people[0].id, people[1].id)
 
-    assert q.get_giftee(conn, event.id, people[0].user_id) is None  # not matched yet
+    assert q.get_giftee(conn, event.id, people[0].email) is None  # not matched yet
     assert q.run_matching(conn, event.id, random.Random(1)) == 6
 
     event = q.get_event(conn, event.id)
@@ -186,14 +168,14 @@ def test_full_flow(conn: sqlite3.Connection, event: q.Event) -> None:
     nicknames = {p.nickname for p in people}
     received = []
     for p in people:
-        g = q.get_giftee(conn, event.id, p.user_id)
+        g = q.get_giftee(conn, event.id, p.email)
         assert g is not None and g.nickname != p.nickname and g.budget == 30
         assert g.clues == (("Hobbies?", "a"), ("Favourite colour?", "b"))
         received.append(g.nickname)
     assert sorted(received) == sorted(nicknames)  # everyone receives exactly once
     # The excluded pair never gives to each other.
-    assert q.get_giftee(conn, event.id, people[0].user_id).nickname != people[1].nickname
-    assert q.get_giftee(conn, event.id, people[1].user_id).nickname != people[0].nickname
+    assert q.get_giftee(conn, event.id, people[0].email).nickname != people[1].nickname
+    assert q.get_giftee(conn, event.id, people[1].email).nickname != people[0].nickname
 
 
 def test_after_matching_everything_is_closed(conn: sqlite3.Connection, event: q.Event) -> None:
@@ -204,7 +186,7 @@ def test_after_matching_everything_is_closed(conn: sqlite3.Connection, event: q.
     with pytest.raises(q.EventClosed):
         signup(conn, event, "late")
     with pytest.raises(q.EventClosed):
-        q.update_signup(conn, event.id, a.user_id, "Ann", "new", ["a", "b"])
+        q.update_signup(conn, event.id, a.email, "Ann", "new", ["a", "b"])
     with pytest.raises(q.EventClosed):
         q.remove_participant(conn, a.id)
     with pytest.raises(q.EventClosed):
@@ -228,8 +210,7 @@ def test_get_giftee_for_non_participant_is_none(conn: sqlite3.Connection, event:
     for n in ("ann", "bob", "cat"):
         signup(conn, event, n)
     q.run_matching(conn, event.id)
-    outsider = q.get_or_create_user(conn, "out@example.com")
-    assert q.get_giftee(conn, event.id, outsider.id) is None
+    assert q.get_giftee(conn, event.id, "out@example.com") is None
 
 
 def test_only_get_giftee_reads_matches() -> None:
@@ -274,21 +255,14 @@ def test_budget_fixed_after_match_but_title_editable(
     assert (renamed.title, renamed.budget) == ("Renamed", 30)
 
 
-def test_join_with_unknown_user_is_not_found(conn: sqlite3.Connection, event: q.Event) -> None:
-    with pytest.raises(q.NotFound, match="log in again"):
-        q.join_event(conn, event.id, 999, "Ghost", "ghost", ["a", "b"])
-    assert not conn.in_transaction
-
-
 def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
     a, b, _ = (signup(conn, event, n) for n in ("ann", "bob", "cat"))
     q.add_exclusion(conn, event.id, a.id, b.id)
     other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
-    signup(conn, other, "zed")
+    signup(conn, other, "ann")  # same person in another event
     q.delete_event(conn, event.id)
     with pytest.raises(q.NotFound):
         q.get_event(conn, event.id)
-    assert q.get_user(conn, a.user_id).name == "Ann"  # users kept
     assert len(q.list_participants(conn, other.id)) == 1  # other events untouched
     q.delete_event(conn, event.id)  # missing: no-op
 

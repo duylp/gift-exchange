@@ -1,12 +1,7 @@
--- Initial schema: users, events, participants, exclusions, matches.
+-- Initial schema: events, participants, exclusions, matches.
+-- No users table: a person is identified by email within each event (the login cookie holds
+-- the signed email). Cross-event features can match on email.
 -- All tables STRICT (SQLite enforces column types). Timestamps are UTC ISO-8601 text.
-
-CREATE TABLE users (
-    id         INTEGER PRIMARY KEY,
-    email      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    name       TEXT,                 -- real name; set on first sign-up (user row is created at login)
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-) STRICT;
 
 CREATE TABLE events (
     id         INTEGER PRIMARY KEY,
@@ -26,13 +21,14 @@ CREATE TABLE events (
 CREATE TABLE participants (
     id         INTEGER PRIMARY KEY,
     event_id   INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-    user_id    INTEGER NOT NULL REFERENCES users(id),
+    email      TEXT NOT NULL COLLATE NOCASE,  -- lowercased; identifies the person (login)
+    name       TEXT NOT NULL,                 -- real name (organiser view, reveal)
     nickname   TEXT NOT NULL COLLATE NOCASE,  -- anonymous name shown to their Santa
     -- JSON array of answer strings, in the same order as events.questions
     answers    TEXT NOT NULL DEFAULT '[]'
                CHECK (json_valid(answers) AND json_type(answers) = 'array'),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE (event_id, user_id),    -- join an event once
+    UNIQUE (event_id, email),      -- join an event once
     UNIQUE (event_id, nickname),   -- unambiguous for guess-your-Santa
     UNIQUE (event_id, id)          -- target for the same-event foreign keys below
 ) STRICT;
@@ -58,7 +54,7 @@ CREATE TABLE matches (
     FOREIGN KEY (event_id, giftee_id) REFERENCES participants(event_id, id)
 ) STRICT;
 
-CREATE INDEX participants_user ON participants(user_id);
+CREATE INDEX participants_email ON participants(email);
 CREATE INDEX exclusions_event ON exclusions(event_id);
 CREATE INDEX matches_event ON matches(event_id);
 
