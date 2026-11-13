@@ -14,7 +14,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **DNS / registrar:** Cloudflare (registrar + DNS). App record is DNS-only (proxy off) so Caddy terminates TLS.
 - **Repo:** public on GitHub. Secrets never committed.
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
-- **Migrations:** own minimal engine — numbered plain-SQL scripts (`migrations/0001_*.sql`, …) applied in order, applied versions tracked in a table. No Alembic, no ORM — the schema exists only in the SQL files.
+- **Migrations:** own minimal engine — forward-only numbered plain-SQL scripts, auto-applied at startup; no down scripts — DB snapshot before every run is the undo. No Alembic, no ORM — the schema exists only in the SQL files. Full design: `docs/migrations.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
 - **Auth:** magic link (itsdangerous) → long-lived signed session cookie (~60 days). A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding `user_id`; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
 - **Email:** `httpx` POST to the Resend API (no SDK). Dev backend prints the link to the console.
