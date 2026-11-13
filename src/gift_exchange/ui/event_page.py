@@ -48,8 +48,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
     ui.page_title(event.title)
     with page_frame():
         _header(event, count)
-        # Open for newcomers deciding whether to join; folded once you're in.
-        _how_it_works(event, expanded=event.is_open and me is None)
+        _how_it_works(event)
         if email is None:
             _welcome(event)
         elif event.is_open and (me is None or edit):
@@ -185,7 +184,7 @@ def _header(event: db.Event, count: int) -> None:
     ui.separator()
 
 
-def _how_it_works(event: db.Event, expanded: bool) -> None:
+def _how_it_works(event: db.Event) -> None:
     """The rules of the exchange, built from the event's settings (budget, sections)."""
     steps = [
         "**Sign up** with your real name, a secret nickname and answers to a few questions. "
@@ -193,8 +192,7 @@ def _how_it_works(event: db.Event, expanded: bool) -> None:
         + (" (you can edit them until the draw)." if event.is_open else "."),
         (
             "**The draw:** once everyone's in, the organiser runs it. Everyone becomes Santa for "
-            "one other person, picked at random. You never get yourself, two people never get "
-            "each other, and couples can be kept apart."
+            "one other person, picked at random."
         ),
         (
             "**Your giftee:** this page then shows their nickname and clues, never their real "
@@ -210,12 +208,8 @@ def _how_it_works(event: db.Event, expanded: bool) -> None:
         steps.append(
             "Answers marked 🤫 aren't shown to your Santa; they're saved for the party reveal."
         )
-    with (
-        ui.expansion("How it works", icon="help_outline", value=expanded)
-        .classes("w-full")
-        .props("dense header-class=font-semibold")
-    ):
-        ui.markdown("\n".join(f"{i}. {step}" for i, step in enumerate(steps, 1)))
+    ui.label("How it works").classes("font-semibold")
+    ui.markdown("\n".join(f"{i}. {step}" for i, step in enumerate(steps, 1))).classes("-mt-4")
 
 
 def _section_heading(section: db.Section) -> None:
