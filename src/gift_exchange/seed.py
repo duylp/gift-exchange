@@ -4,7 +4,8 @@
 
 Creates event `xmas-2026` (a visible and a hidden reveal-only question section) with 8
 fake participants (emails @example.com) and one couple exclusion, left open (not matched)
-so the admin page can be tried. Does nothing if the event already exists. For development
+so the admin page can be tried. Alex Tan (alex.tan@example.com) is meant to be the admin:
+put that email in ADMIN_EMAILS (as `.env.example` does) to be both organiser and participant. Does nothing if the event already exists. For development
 only — refuses to run unless DEV=1.
 """
 
@@ -48,6 +49,11 @@ PEOPLE = [
     ("Hana Yeo", "Cocoa", ["Reading", "Red", "A Kindle cover", "Perfume", "The end"]),
 ]
 COUPLE = ("Alex Tan", "Bea Lim")
+ADMIN = "Alex Tan"
+
+
+def _email(name: str) -> str:
+    return name.lower().replace(" ", ".") + "@example.com"
 
 
 def main() -> int:
@@ -69,8 +75,7 @@ def main() -> int:
         try:
             ids = {}
             for name, nickname, answers in PEOPLE:
-                email = name.lower().replace(" ", ".") + "@example.com"
-                ids[name] = db.join_event(conn, event.id, email, name, nickname, answers).id
+                ids[name] = db.join_event(conn, event.id, _email(name), name, nickname, answers).id
             db.add_exclusion(conn, event.id, ids[COUPLE[0]], ids[COUPLE[1]])
         except BaseException:
             db.delete_event(conn, event.id)  # all-or-nothing: next run starts clean
@@ -79,6 +84,11 @@ def main() -> int:
             f"Created '{SLUG}' with {len(PEOPLE)} participants and "
             f"{COUPLE[0]} ✕ {COUPLE[1]} excluded, in {settings.db_path}."
         )
+        admin = _email(ADMIN)
+        if admin in settings.admin_emails:
+            print(f"Log in as {admin} (admin and participant).")
+        else:
+            print(f"Tip: set ADMIN_EMAILS={admin} in .env to log in as admin {ADMIN}.")
         return 0
     finally:
         conn.close()
