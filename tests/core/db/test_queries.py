@@ -280,3 +280,17 @@ def test_count_participants(conn: sqlite3.Connection, event: q.Event) -> None:
     signup(conn, event, "ann")
     signup(conn, event, "bob")
     assert q.count_participants(conn, event.id) == 2
+
+
+def test_list_events_joined_by(conn: sqlite3.Connection, event: q.Event) -> None:
+    other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
+    q.create_event(conn, "not-joined", "Not joined", 10, [])
+    signup(conn, event, "ann")
+    signup(conn, other, "ann")
+    signup(conn, event, "bob")
+    assert [e.slug for e in q.list_events_joined_by(conn, " ANN@example.com ")] == [
+        "other",
+        "xmas-2026",
+    ]
+    assert [e.slug for e in q.list_events_joined_by(conn, "bob@example.com")] == ["xmas-2026"]
+    assert q.list_events_joined_by(conn, "nobody@example.com") == []

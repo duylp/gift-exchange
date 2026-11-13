@@ -25,6 +25,7 @@ from gift_exchange.core.db.events import (
     get_event,
     get_event_by_slug,
     list_events,
+    list_events_joined_by,
     update_event,
 )
 from gift_exchange.core.db.exclusions import add_exclusion, list_exclusions, remove_exclusion
@@ -63,6 +64,7 @@ __all__ = [
     "get_participant",
     "join_event",
     "list_events",
+    "list_events_joined_by",
     "list_exclusions",
     "list_participants",
     "remove_exclusion",

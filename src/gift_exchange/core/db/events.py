@@ -72,6 +72,24 @@ def list_events(conn: sqlite3.Connection) -> list[Event]:
     return [event_from_row(r) for r in conn.execute("SELECT * FROM events ORDER BY id DESC")]
 
 
+def list_events_joined_by(conn: sqlite3.Connection, email: str) -> list[Event]:
+    """Events this email has signed up for, newest first (for the person's home page).
+
+    Args:
+        conn: Database connection.
+        email: The logged-in email (case and surrounding spaces are ignored).
+
+    Returns:
+        Only events this email joined — never other events.
+    """
+    rows = conn.execute(
+        "SELECT e.* FROM events AS e JOIN participants AS p ON p.event_id = e.id "
+        "WHERE p.email = ? ORDER BY e.id DESC",
+        (email.strip().lower(),),
+    )
+    return [event_from_row(r) for r in rows]
+
+
 def update_event(
     conn: sqlite3.Connection, event_id: int, title: str, budget: int, questions: Sequence[str]
 ) -> Event:
