@@ -16,7 +16,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
 - **Migrations:** own minimal engine `sqlite_migrate` — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. App usage: `docs/migrations.md`; engine design: `src/sqlite_migrate/README.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
-- **Auth:** magic link (itsdangerous) → long-lived signed session cookie (~60 days). A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding the person's email; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
+- **Auth:** magic link (itsdangerous) → signed session cookie valid for 30 days. A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding the person's email; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
 - **Email:** `httpx` POST to the Resend API (no SDK). Dev backend prints the link to the console.
 - **Multi-event:** the app is occasion-agnostic; an event has just a slug, title and budget (no themes/branding in v1).
 
