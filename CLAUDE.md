@@ -39,7 +39,8 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Types:** type hints everywhere; no type checker in v1.
 - **Lint/format:** ruff (check + format).
 - **Tests:** pytest for core only (matching, migrations, DB queries, auth tokens). UI is checked by hand.
-- **Dev run:** `uv run` locally with auto-reload and a local SQLite file; Docker is for deployment only.
+- **Run:** `cp .env.example .env` (set `SECRET_KEY`), then `uv run python -m gift_exchange.main` — auto-reloads when `DEV=1`. Same command in Docker. No console-script entry point (breaks NiceGUI reload). Docker is for deployment only.
+- **Check before commit:** `uv run ruff format . && uv run ruff check . && uv run pytest`
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
 
 ## Data model (draft)

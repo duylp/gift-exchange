@@ -1,0 +1,31 @@
+[project]
+name = "gift-exchange"
+version = "0.1.0"
+description = "Secret Santa-style gift exchange web app"
+readme = "README.md"
+authors = [
+    { name = "duylp" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "itsdangerous>=2.2.0",
+    "nicegui==4.0.0",
+    "python-dotenv>=1.2.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
