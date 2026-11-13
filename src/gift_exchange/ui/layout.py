@@ -5,31 +5,61 @@ from nicegui import ui
 from gift_exchange.core import db
 from gift_exchange.ui.themes import Theme, get_theme
 
-# Snowflakes as (left %, fall seconds, delay seconds, size rem): fixed, so no randomness.
-_FLAKES = [
-    (3, 14, 0, 0.9),
-    (11, 18, 6, 0.7),
-    (19, 12, 3, 1.1),
-    (27, 16, 9, 0.8),
-    (35, 20, 1, 0.6),
-    (43, 13, 7, 1.0),
-    (51, 17, 4, 0.7),
-    (59, 15, 11, 0.9),
-    (67, 19, 2, 0.6),
-    (75, 12, 8, 1.1),
-    (83, 16, 5, 0.8),
-    (91, 14, 10, 0.7),
-    (97, 18, 3, 0.9),
+# Small coloured drawings that fall with the snow (fixed constants, so no sanitising).
+_CANE_SVG = """<svg viewBox="0 0 24 40" width="0.6em" height="1em">
+<path d="M7 37V13a6 6 0 0 1 12 0v3" fill="none" stroke="#cbd5e1" stroke-width="6.5"
+ stroke-linecap="round"/>
+<path d="M7 37V13a6 6 0 0 1 12 0v3" fill="none" stroke="#fff" stroke-width="5"
+ stroke-linecap="round"/>
+<path d="M7 37V13a6 6 0 0 1 12 0v3" fill="none" stroke="#dc2626" stroke-width="5"
+ stroke-dasharray="3 3"/>
+</svg>"""
+
+_SOCK_SVG = """<svg viewBox="0 0 32 40" width="0.8em" height="1em">
+<path d="M8 9H20V24Q21 26 24 27L27 28Q31 30 29 34Q27 38 22 37L12 35Q8 34 8 29Z"
+ fill="#dc2626"/>
+<rect x="8" y="17" width="12" height="3" fill="#15803d"/>
+<path d="M24 27L27 28Q31 30 29 34Q28 36 26 37Q28 32 24 27Z" fill="#15803d"/>
+<path d="M8 27Q8 34 12 35L14 35Q10 32 8 27Z" fill="#15803d"/>
+<rect x="6" y="4" width="16" height="7" rx="2" fill="#fff" stroke="#cbd5e1"/>
+</svg>"""
+
+# Falling items as (kind, left %, fall seconds, delay seconds, size rem): fixed positions,
+# so no randomness. Mostly snow, with a few socks and candy canes.
+_FALLING = [
+    ("flake", 3, 14, 0, 0.9),
+    ("cane", 11, 18, 6, 1.9),
+    ("flake", 19, 12, 3, 1.1),
+    ("sock", 27, 16, 9, 1.9),
+    ("flake", 35, 20, 1, 0.6),
+    ("flake", 43, 13, 7, 1.0),
+    ("cane", 51, 17, 4, 1.9),
+    ("flake", 59, 15, 11, 0.9),
+    ("sock", 67, 19, 2, 1.9),
+    ("flake", 75, 12, 8, 1.1),
+    ("cane", 83, 16, 5, 1.9),
+    ("flake", 91, 14, 10, 0.7),
+    ("sock", 97, 18, 3, 1.9),
 ]
 
 _SNOW_CSS = """
 .theme-snow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .theme-snow > * {
-    position: absolute; top: -2rem; color: #94a3b8; opacity: 0.55;
+    position: absolute; top: -2.5rem; line-height: 1;
     animation: theme-fall linear infinite;
 }
+.theme-snow > .theme-flake { color: #94a3b8; opacity: 0.55; }
+.theme-snow > .theme-toy { opacity: 0.8; animation-name: theme-sway; }
+.theme-snow svg { display: block; }
 @keyframes theme-fall {
-    to { transform: translateY(calc(100vh + 4rem)) rotate(180deg); }
+    to { transform: translateY(calc(100vh + 5rem)) rotate(180deg); }
+}
+@keyframes theme-sway {
+    0%   { transform: translateY(0) rotate(-15deg); }
+    25%  { transform: translateY(calc(25vh + 1.25rem)) rotate(15deg); }
+    50%  { transform: translateY(calc(50vh + 2.5rem)) rotate(-15deg); }
+    75%  { transform: translateY(calc(75vh + 3.75rem)) rotate(15deg); }
+    100% { transform: translateY(calc(100vh + 5rem)) rotate(-15deg); }
 }
 @media (prefers-reduced-motion: reduce) { .theme-snow { display: none; } }
 """
@@ -68,7 +98,7 @@ def page_frame(max_width: str = "max-w-md", theme: str = db.DEFAULT_THEME) -> ui
 
 
 def _apply(look: Theme) -> None:
-    """Page-wide styling for a theme: colours, background, title font, snow."""
+    """Page-wide styling for a theme: colours, background, title font, falling snow and toys."""
     if look.colors:
         ui.colors(**look.colors)
     if look.background:
@@ -85,8 +115,13 @@ def _apply(look: Theme) -> None:
     if look.snow:
         ui.add_css(_SNOW_CSS)
         with ui.element("div").classes("theme-snow").props('aria-hidden="true"'):
-            for left, fall, delay, size in _FLAKES:
-                ui.label("❄").style(
+            for kind, left, fall, delay, size in _FALLING:
+                if kind == "flake":
+                    item = ui.label("❄").classes("theme-flake")
+                else:
+                    svg = _SOCK_SVG if kind == "sock" else _CANE_SVG
+                    item = ui.html(svg, sanitize=False).classes("theme-toy")
+                item.style(
                     f"left: {left}%; font-size: {size}rem; "
                     f"animation-duration: {fall}s; animation-delay: -{delay}s"
                 )

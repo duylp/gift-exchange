@@ -22,7 +22,8 @@ class Theme:
         title_font: Google Fonts family for the event title (class `theme-title`), or None.
         card: Put the page content on a white rounded card (readable over a background).
         stripe: Candy-cane stripe under the header.
-        snow: Gently falling snowflakes behind the content (off for reduced motion).
+        snow: Snowflakes, socks and candy canes falling behind the content (off for
+            reduced motion).
     """
 
     label: str
