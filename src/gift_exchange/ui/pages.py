@@ -29,8 +29,8 @@ def index(request: Request) -> None:
     with open_db() as conn:
         joined = db.list_events_joined_by(conn, email)
 
-    # Styled like the top card (newest event joined); plain if none.
-    with page_frame(theme=joined[0].theme if joined else "plain"):
+    # Styled like the top card (newest event joined); the default theme if none.
+    with page_frame(theme=joined[0].theme if joined else db.DEFAULT_THEME):
         _your_exchanges(joined)
         if current_admin(request):
             _organiser()

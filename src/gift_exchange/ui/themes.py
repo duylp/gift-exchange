@@ -1,7 +1,8 @@
 """How each event theme looks. The theme names live in `db.THEMES`; this maps them to styles.
 
 A theme is applied per page by `layout.page_frame(theme=...)`: the event page uses its
-event's theme, the logged-in home page that of the newest event joined; other pages "plain".
+event's theme, the logged-in home page that of the newest event joined; other pages
+`db.DEFAULT_THEME`.
 """
 
 from dataclasses import dataclass, field
@@ -35,7 +36,6 @@ class Theme:
 
 
 THEMES: dict[str, Theme] = {
-    "plain": Theme("Plain"),
     "christmas": Theme(
         "Christmas 🎄",
         colors={"primary": "#15803d", "secondary": "#b91c1c", "accent": "#ca8a04"},
@@ -46,14 +46,15 @@ THEMES: dict[str, Theme] = {
         stripe=True,
         snow=True,
     ),
+    "plain": Theme("Plain"),
 }
 
 assert set(THEMES) == set(db.THEMES), "ui/themes.py must style exactly db.THEMES"
 
 
 def get_theme(name: str) -> Theme:
-    """The theme called `name`, or "plain" if there is no such theme."""
-    return THEMES.get(name, THEMES["plain"])
+    """The theme called `name`, or the default theme if there is no such theme."""
+    return THEMES.get(name, THEMES[db.DEFAULT_THEME])
 
 
 def theme_options() -> dict[str, str]:

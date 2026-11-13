@@ -17,8 +17,8 @@ CREATE TABLE events (
     status     TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'matched')),
     -- look of the event page: a preset name (core/db/models.py THEMES, styled in
     -- ui/themes.py). No CHECK, so a new theme needs no migration; core/db validates on
-    -- write, the UI falls back to 'plain'. Cosmetic: editable after matching.
-    theme      TEXT NOT NULL DEFAULT 'plain',
+    -- write, the UI falls back to the default. Cosmetic: editable after matching.
+    theme      TEXT NOT NULL DEFAULT 'christmas',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     matched_at TEXT
 ) STRICT;

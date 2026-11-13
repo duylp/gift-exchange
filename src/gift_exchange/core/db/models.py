@@ -5,8 +5,10 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-THEMES = ("plain", "christmas")
-"""Theme names an event can use (each is styled in `ui/themes.py`); the first is the default."""
+THEMES = ("christmas", "plain")
+"""Theme names an event can use (each is styled in `ui/themes.py`)."""
+DEFAULT_THEME = THEMES[0]
+"""Theme for new events, and for pages not tied to one event."""
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,7 @@ class Event:
     sections: tuple[Section, ...]
     status: str
     matched_at: str | None
-    theme: str = THEMES[0]
+    theme: str = DEFAULT_THEME
 
     @property
     def is_open(self) -> bool:

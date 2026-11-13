@@ -2,6 +2,7 @@
 
 from nicegui import ui
 
+from gift_exchange.core import db
 from gift_exchange.ui.themes import Theme, get_theme
 
 # Snowflakes as (left %, fall seconds, delay seconds, size rem): fixed, so no randomness.
@@ -41,7 +42,7 @@ _STRIPE_CSS = """
 """
 
 
-def page_frame(max_width: str = "max-w-md", theme: str = "plain") -> ui.column:
+def page_frame(max_width: str = "max-w-md", theme: str = db.DEFAULT_THEME) -> ui.column:
     """The column every page builds into, starting with a link home to `/`.
 
     Use as `with page_frame(): ...`.
@@ -49,7 +50,7 @@ def page_frame(max_width: str = "max-w-md", theme: str = "plain") -> ui.column:
     Args:
         max_width: Tailwind max-width class for the column (wider for admin pages).
         theme: Name of the theme to style the page with (see `ui/themes.py`); unknown
-            names fall back to "plain".
+            names fall back to `db.DEFAULT_THEME`.
     """
     look = get_theme(theme)
     _apply(look)

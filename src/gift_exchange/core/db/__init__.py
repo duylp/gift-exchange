@@ -30,7 +30,15 @@ from gift_exchange.core.db.events import (
 )
 from gift_exchange.core.db.exclusions import add_exclusion, list_exclusions, remove_exclusion
 from gift_exchange.core.db.matches import event_feasibility, get_giftee, run_matching
-from gift_exchange.core.db.models import THEMES, Event, Giftee, Participant, Section, pair_answers
+from gift_exchange.core.db.models import (
+    DEFAULT_THEME,
+    THEMES,
+    Event,
+    Giftee,
+    Participant,
+    Section,
+    pair_answers,
+)
 from gift_exchange.core.db.signups import (
     count_participants,
     get_participant,
@@ -41,6 +49,7 @@ from gift_exchange.core.db.signups import (
 )
 
 __all__ = [
+    "DEFAULT_THEME",
     "MIGRATIONS_DIR",
     "THEMES",
     "AlreadyJoined",

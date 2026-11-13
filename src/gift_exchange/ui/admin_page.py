@@ -91,7 +91,7 @@ def _new_event_form() -> None:
         .classes("w-full")
     )
     budget = ui.number("Budget (S$)", value=30, min=1, precision=0).props("outlined")
-    theme = _theme_select(db.THEMES[0])
+    theme = _theme_select(db.DEFAULT_THEME)
     get_sections = _question_editor([])
 
     def create() -> None:

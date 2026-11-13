@@ -74,7 +74,7 @@ def test_update_event_questions_locked_after_signup(
 
 
 def test_event_theme(conn: sqlite3.Connection, event: q.Event) -> None:
-    assert event.theme == "plain"
+    assert event.theme == q.DEFAULT_THEME == "christmas"
     e = q.create_event(conn, "xmas-2027", "Xmas 2027", 30, [], theme="christmas")
     assert e.theme == "christmas"
     assert q.update_event(conn, e.id, "Xmas", 30, []).theme == "christmas"  # None keeps it

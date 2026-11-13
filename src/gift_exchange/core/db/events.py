@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from gift_exchange.core.db._util import require
 from gift_exchange.core.db.errors import EventClosed, NotFound, QuestionsLocked, SlugTaken
 from gift_exchange.core.db.models import (
+    DEFAULT_THEME,
     THEMES,
     Event,
     Section,
@@ -21,7 +22,7 @@ def create_event(
     title: str,
     budget: int,
     sections: Sequence[Section],
-    theme: str = THEMES[0],
+    theme: str = DEFAULT_THEME,
 ) -> Event:
     """Create an event, open for sign-ups.
 
@@ -32,7 +33,7 @@ def create_event(
         budget: Gift budget in whole S$ (> 0).
         sections: Clue question groups. Text is stripped; blank questions, and sections
             left with none, are dropped.
-        theme: Look of the event page, one of `THEMES` (default "plain").
+        theme: Look of the event page, one of `THEMES` (default `DEFAULT_THEME`).
 
     Returns:
         The new event.
