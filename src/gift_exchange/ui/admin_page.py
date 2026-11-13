@@ -218,10 +218,20 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
         if amount is None:
             ui.notify("Budget must be a whole number above 0.", type="warning")
             return
-        new_sections = list(event.sections) if questions_locked else get_sections()
+        new_sections = None if questions_locked else get_sections()  # None: keep them
         try:
             with open_db() as conn:
-                db.update_event(conn, event.id, title.value, amount, new_sections, theme.value)
+                try:
+                    db.update_event(conn, event.id, title.value, amount, new_sections, theme.value)
+                except db.QuestionsLocked:
+                    # Someone joined since the page loaded: save the rest, keep the questions.
+                    db.update_event(conn, event.id, title.value, amount, None, theme.value)
+                    ui.notify(
+                        "Saved, except the questions: someone has joined, so they're locked.",
+                        type="warning",
+                    )
+                    ui.timer(3, reload, once=True)  # then show the locked questions
+                    return
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
             return

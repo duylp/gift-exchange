@@ -113,7 +113,7 @@ def update_event(
     event_id: int,
     title: str,
     budget: int,
-    sections: Sequence[Section],
+    sections: Sequence[Section] | None,
     theme: str | None = None,
 ) -> Event:
     """Change an event's title, budget, clue question sections and theme.
@@ -123,15 +123,15 @@ def update_event(
         event_id: The event.
         title: New title.
         budget: New budget in whole S$ (> 0).
-        sections: New sections (cleaned like `create_event`). Passing the current
-            sections unchanged is always fine, even after people have signed up.
+        sections: New sections (cleaned like `create_event`), or None to keep the
+            current ones (always fine, even after people have signed up).
         theme: New theme, one of `THEMES`; None keeps the current one. Can always change.
 
     Returns:
         The updated event.
 
     Raises:
-        QuestionsLocked: If the sections differ and someone has already signed up.
+        QuestionsLocked: If new sections differ and someone has already signed up.
         EventClosed: If the budget differs and the event has been matched (Santas may
             already have bought gifts). The title can always change.
         NotFound: If there is no such event.
@@ -140,11 +140,12 @@ def update_event(
     require(title.strip(), "Title is required.")
     if theme is not None:
         _check_theme(theme)
+    questions = None if sections is None else encode_sections(clean_sections(sections))
     try:
         cur = conn.execute(
-            "UPDATE events SET title = ?, budget = ?, questions = ?, theme = COALESCE(?, theme) "
-            "WHERE id = ?",
-            (title.strip(), budget, encode_sections(clean_sections(sections)), theme, event_id),
+            "UPDATE events SET title = ?, budget = ?, questions = COALESCE(?, questions), "
+            "theme = COALESCE(?, theme) WHERE id = ?",
+            (title.strip(), budget, questions, theme, event_id),
         )
     except sqlite3.IntegrityError as exc:
         if "locked" in str(exc):

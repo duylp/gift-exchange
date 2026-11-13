@@ -302,6 +302,8 @@ def test_budget_fixed_after_match_but_title_editable(
         q.update_event(conn, event.id, event.title, 999, QUESTIONS)
     renamed = q.update_event(conn, event.id, "Renamed", event.budget, QUESTIONS, "christmas")
     assert (renamed.title, renamed.budget, renamed.theme) == ("Renamed", 30, "christmas")
+    kept = q.update_event(conn, event.id, "Again", event.budget, None)  # None keeps sections
+    assert (kept.title, kept.sections) == ("Again", event.sections)
 
 
 def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
