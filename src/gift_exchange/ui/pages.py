@@ -39,7 +39,7 @@ def index(request: Request) -> None:
 
 def _your_exchanges(events: list[db.Event]) -> None:
     """Events this person joined, as big clickable cards (the participant view)."""
-    ui.label("🎄 Your exchanges").classes("text-lg font-semibold")
+    ui.label("🎄 Your exchanges").classes("theme-title text-lg font-semibold")
     if not events:
         ui.label("You haven't joined any yet. Open the link from your group chat to join.").classes(
             "text-gray-600"
@@ -59,7 +59,7 @@ def _your_exchanges(events: list[db.Event]) -> None:
 def _organiser() -> None:
     """A separate "Organiser" block with a button to the admin pages (admins only)."""
     ui.separator().classes("mt-6")
-    ui.label("🛠️ Organiser").classes("text-lg font-semibold")
+    ui.label("🛠️ Organiser").classes("theme-title text-lg font-semibold")
     ui.label("Create events, see who joined and run the draw.").classes(
         "text-sm text-gray-600 -mt-3"
     )

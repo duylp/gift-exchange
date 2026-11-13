@@ -83,7 +83,7 @@ def login_page(request: Request, next: str = "/", error: str = "") -> RedirectRe
         return RedirectResponse(target, 303)
 
     with page_frame("max-w-sm"):
-        ui.label("Log in 🎁").classes("text-2xl font-bold")
+        ui.label("Log in 🎁").classes("theme-title text-2xl font-bold")
         if error in _LINK_ERRORS:
             ui.label(_LINK_ERRORS[error]).classes("text-red-700")
         login_form(target)
@@ -132,7 +132,7 @@ def login_form(next_path: str) -> None:
         form.set_visibility(False)
         with sent:
             sent.clear()
-            ui.label(f"Check your email ({email}) 📬").classes("text-lg font-semibold")
+            ui.label(f"Check your email ({email}) 📬").classes("theme-title text-lg font-semibold")
             ui.label(
                 "Tap the link in it to log in. It works for 15 minutes. "
                 "Not there? Check your spam folder, or check the address and try again."

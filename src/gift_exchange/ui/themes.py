@@ -19,7 +19,8 @@ class Theme:
         colors: Quasar colours for `ui.colors` (buttons, inputs, toggles); empty = defaults.
         header: Text of the link home at the top of the page.
         background: CSS `background` for the page body, or None for the default.
-        title_font: Google Fonts family for the event title (class `theme-title`), or None.
+        title_font: Google Fonts family for headings (class `theme-title`), or None.
+        body_font: Google Fonts family for all other text, or None for the default.
         card: Put the page content on a white rounded card (readable over a background).
         stripe: Candy-cane stripe under the header.
         snow: Snowflakes, socks and candy canes falling behind the content (off for
@@ -31,6 +32,7 @@ class Theme:
     header: str = "🎁 Gift exchange"
     background: str | None = None
     title_font: str | None = None
+    body_font: str | None = None
     card: bool = False
     stripe: bool = False
     snow: bool = False
@@ -43,6 +45,7 @@ THEMES: dict[str, Theme] = {
         header="🎄 Gift exchange 🎁",
         background="linear-gradient(180deg, #fdf2f2 0%, #f0f7f1 100%) fixed",
         title_font="Mountains of Christmas",
+        body_font="Nunito",
         card=True,
         stripe=True,
         snow=True,

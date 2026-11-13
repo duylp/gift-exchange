@@ -95,18 +95,12 @@ def page_frame(max_width: str = "max-w-md", theme: str = db.DEFAULT_THEME) -> ui
 
 
 def _apply(look: Theme) -> None:
-    """Page-wide styling for a theme: colours, background, title font, falling snow and toys."""
+    """Page-wide styling for a theme: colours, background, fonts, falling snow and toys."""
     if look.colors:
         ui.colors(**look.colors)
     if look.background:
         ui.query("body").style(f"background: {look.background}")
-    if look.title_font:
-        family = look.title_font.replace(" ", "+")
-        ui.add_head_html(
-            '<link rel="stylesheet" '
-            f'href="https://fonts.googleapis.com/css2?family={family}:wght@700&display=swap">'
-        )
-        ui.add_css(f".theme-title {{ font-family: '{look.title_font}', cursive; }}")
+    _add_fonts(look)
     if look.stripe:
         ui.add_css(_STRIPE_CSS)
     if look.snow:
@@ -126,6 +120,22 @@ def _apply(look: Theme) -> None:
                     f"left: calc({left}% - {size / 2}rem); font-size: {size}rem; "
                     f"animation-duration: {fall}s; animation-delay: -{delay}s"
                 )
+
+
+def _add_fonts(look: Theme) -> None:
+    """Load the theme's Google Fonts (one request) and apply them."""
+    families = []
+    if look.body_font:
+        families.append(f"family={look.body_font.replace(' ', '+')}:wght@400;600;700")
+        ui.add_css(f"body {{ font-family: '{look.body_font}', sans-serif; }}")
+    if look.title_font:
+        families.append(f"family={look.title_font.replace(' ', '+')}:wght@700")
+        ui.add_css(f".theme-title {{ font-family: '{look.title_font}', cursive; }}")
+    if families:
+        ui.add_head_html(
+            '<link rel="stylesheet" '
+            f'href="https://fonts.googleapis.com/css2?{"&".join(families)}&display=swap">'
+        )
 
 
 def account_footer(email: str) -> None:
