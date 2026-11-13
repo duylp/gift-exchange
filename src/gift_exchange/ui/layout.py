@@ -27,7 +27,8 @@ _SOCK_SVG = """<svg viewBox="0 0 32 40" width="0.8em" height="1em">
 </svg>"""
 
 # Falling items as (kind, centre %, fall seconds, delay seconds, size rem): fixed positions.
-# Mostly snow, with a few socks and candy canes (each tilted at random, see `_apply`).
+# Mostly snow, with a few socks and candy canes. Each starts at a random angle and turns
+# steadily one way while falling (see `_apply`).
 _FALLING = [
     ("flake", 3, 14, 0, 1.8),
     ("cane", 11, 18, 6, 5.2),
@@ -48,20 +49,14 @@ _SNOW_CSS = """
 .theme-snow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
 .theme-snow > * {
     position: absolute; top: -8rem; line-height: 1;
-    animation: theme-fall linear infinite;
+    animation: theme-fall linear infinite; --tilt: 0deg; --spin: 180deg;
 }
 .theme-snow > .theme-flake { color: #94a3b8; opacity: 0.55; }
-.theme-snow > .theme-toy { opacity: 0.8; animation-name: theme-sway; --tilt: 0deg; }
+.theme-snow > .theme-toy { opacity: 0.8; }
 .theme-snow svg { display: block; }
 @keyframes theme-fall {
-    to { transform: translateY(calc(100vh + 16rem)) rotate(180deg); }
-}
-@keyframes theme-sway {
-    0%   { transform: translateY(0) rotate(calc(var(--tilt) - 15deg)); }
-    25%  { transform: translateY(calc(25vh + 4rem)) rotate(calc(var(--tilt) + 15deg)); }
-    50%  { transform: translateY(calc(50vh + 8rem)) rotate(calc(var(--tilt) - 15deg)); }
-    75%  { transform: translateY(calc(75vh + 12rem)) rotate(calc(var(--tilt) + 15deg)); }
-    100% { transform: translateY(calc(100vh + 16rem)) rotate(calc(var(--tilt) - 15deg)); }
+    from { transform: translateY(0) rotate(var(--tilt)); }
+    to { transform: translateY(calc(100vh + 16rem)) rotate(calc(var(--tilt) + var(--spin))); }
 }
 @media (prefers-reduced-motion: reduce) { .theme-snow { display: none; } }
 """
@@ -123,8 +118,10 @@ def _apply(look: Theme) -> None:
                 else:
                     svg = _SOCK_SVG if kind == "sock" else _CANE_SVG
                     item = ui.html(svg, sanitize=False).classes("theme-toy")
-                    # Random tilt per page load; it sways ±15° around it while falling.
-                    item.style(f"--tilt: {random.randint(-180, 180)}deg")
+                # Random start angle, then a steady turn one way (180–360°, either direction)
+                # for the whole fall; new values on every page load.
+                spin = random.choice((-1, 1)) * random.randint(180, 360)
+                item.style(f"--tilt: {random.randint(-180, 180)}deg; --spin: {spin}deg")
                 item.style(
                     f"left: calc({left}% - {size / 2}rem); font-size: {size}rem; "
                     f"animation-duration: {fall}s; animation-delay: -{delay}s"
