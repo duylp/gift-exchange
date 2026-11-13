@@ -41,6 +41,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `tests/` and `migrations/` at repo root.
 - **DB access:** stdlib `sqlite3`; all queries in `core/` DB module(s), returning dataclasses. UI never writes SQL.
 - **Types:** type hints everywhere; no type checker in v1.
+- **Docstrings:** Google style (`Args:` / `Returns:` / `Raises:`) on public functions and classes, explaining every parameter.
 - **Lint/format:** ruff (check + format).
 - **Tests:** pytest for core only (matching, migrations, DB queries, auth tokens). UI is checked by hand.
 - **Run:** `cp .env.example .env` (set `SECRET_KEY`), then `uv run python -m gift_exchange.main` — auto-reloads when `DEV=1`. Same command in Docker. No console-script entry point (breaks NiceGUI reload). Docker is for deployment only.

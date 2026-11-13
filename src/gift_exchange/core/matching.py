@@ -18,7 +18,16 @@ MAX_ATTEMPTS = 10_000
 
 
 class MatchingError(ValueError):
-    """No valid assignment could be made. `people` are the ones to look at, if known."""
+    """No valid assignment could be made.
+
+    Args:
+        message: Human-readable reason, suitable to show the organiser.
+        people: The people causing the problem (e.g. those with too few allowed
+            partners), so the UI can name them. Empty if no one in particular.
+
+    Attributes:
+        people: Same as the `people` argument, as a tuple.
+    """
 
     def __init__(self, message: str, people: Sequence[Hashable] = ()) -> None:
         super().__init__(message)
@@ -26,6 +35,8 @@ class MatchingError(ValueError):
 
 
 class Verdict(Enum):
+    """Outcome of `check_feasibility`."""
+
     IMPOSSIBLE = "impossible"  # provably no valid assignment
     GUARANTEED = "guaranteed"  # provably at least one valid assignment
     UNCERTAIN = "uncertain"  # neither check applies; shuffling will tell
@@ -33,14 +44,36 @@ class Verdict(Enum):
 
 @dataclass(frozen=True)
 class Feasibility:
+    """Result of `check_feasibility`.
+
+    Attributes:
+        verdict: Whether a valid assignment is impossible, guaranteed, or uncertain.
+        stuck: People with fewer than 2 allowed partners (only set when the verdict is
+            IMPOSSIBLE because of them; empty otherwise).
+    """
+
     verdict: Verdict
-    stuck: tuple[Hashable, ...] = ()  # people with fewer than 2 allowed partners
+    stuck: tuple[Hashable, ...] = ()
 
 
 def allowed_partners(
     people: Sequence[Hashable], exclusions: Iterable[tuple[Hashable, Hashable]]
 ) -> dict[Hashable, set[Hashable]]:
-    """For each person, the others they may be matched with (in either direction)."""
+    """For each person, the others they may be matched with (in either direction).
+
+    Args:
+        people: Everyone in the event, as unique hashable IDs.
+        exclusions: Pairs (a, b) who must not be matched with each other in either
+            direction, e.g. couples. Order within a pair does not matter.
+
+    Returns:
+        Mapping from each person to the set of people they may give to (and, since
+        exclusions are two-way, receive from). Never includes the person themselves.
+
+    Raises:
+        ValueError: If `people` has duplicates, or an exclusion pairs someone with
+            themselves or mentions someone not in `people`.
+    """
     exclusions = list(exclusions)
     _validate(people, exclusions)
     allowed = {p: set(people) - {p} for p in people}
@@ -59,6 +92,17 @@ def check_feasibility(
       and your Santa must be two different allowed people.
     - Guaranteed: everyone is allowed with >= n/2 others (n >= 3). By Dirac's theorem the
       "allowed" graph then has a cycle through everyone, which is a valid assignment.
+    - Uncertain: neither applies; `find_matching` will either succeed or give up.
+
+    Args:
+        people: Everyone in the event, as unique hashable IDs.
+        exclusions: Pairs who must not be matched with each other (two-way).
+
+    Returns:
+        A `Feasibility` with the verdict and, if impossible, the people who are stuck.
+
+    Raises:
+        ValueError: On invalid input (see `allowed_partners`).
     """
     allowed = allowed_partners(people, exclusions)
     n = len(people)
@@ -76,10 +120,29 @@ def find_matching(
     rng: random.Random | None = None,
     max_attempts: int = MAX_ATTEMPTS,
 ) -> dict[Hashable, Hashable]:
-    """Return a uniformly random valid {giver: giftee} assignment, or raise MatchingError.
+    """Pick a uniformly random valid assignment of giftees.
 
-    Pass a seeded `rng` for reproducible results (tests only). The default is
-    `random.SystemRandom`, which is unpredictable and has no seed to leak.
+    Args:
+        people: Everyone in the event, as unique hashable IDs (e.g. participant row IDs).
+        exclusions: Pairs who must not be matched with each other in either direction,
+            e.g. couples. Defaults to none.
+        rng: Random number generator used for shuffling. Pass a seeded
+            `random.Random(seed)` for reproducible results — tests only. Defaults to
+            `random.SystemRandom()`, which is unpredictable and has no seed that could
+            leak the matches.
+        max_attempts: How many shuffles to try before giving up. The default (10,000)
+            is far more than any realistic group needs; lower it only in tests.
+
+    Returns:
+        A {giver: giftee} dict covering every person exactly once as giver and once as
+        giftee, with no self-gifts, no reciprocal pairs and no excluded pairs. Keys are
+        in the same order as `people`.
+
+    Raises:
+        MatchingError: If the setup is provably impossible (fewer than 3 people, or
+            someone with fewer than 2 allowed partners), or no valid assignment was
+            found within `max_attempts`. `.people` names who to look at.
+        ValueError: On invalid input (see `allowed_partners`).
     """
     exclusions = list(exclusions)
     feasibility = check_feasibility(people, exclusions)
@@ -110,7 +173,17 @@ def find_matching(
 
 
 def is_valid(assignment: dict[Hashable, Hashable], allowed: dict[Hashable, set[Hashable]]) -> bool:
-    """True if every giver gives to an allowed person and no pair is reciprocal."""
+    """Check an assignment against the rules.
+
+    Args:
+        assignment: A {giver: giftee} dict. Assumed to be a full permutation of the
+            people (every person appears once as a key and once as a value).
+        allowed: Output of `allowed_partners` for the same people and exclusions.
+
+    Returns:
+        True if every giver gives to someone in their allowed set (which rules out
+        self-gifts and excluded pairs) and no two people give to each other.
+    """
     return all(
         giftee in allowed[giver] and assignment[giftee] != giver
         for giver, giftee in assignment.items()
@@ -118,10 +191,16 @@ def is_valid(assignment: dict[Hashable, Hashable], allowed: dict[Hashable, set[H
 
 
 def loops(assignment: dict[Hashable, Hashable]) -> list[list[Hashable]]:
-    """Split an assignment into gift loops, e.g. [[A, B, C], [D, E, F, G]] for the reveal.
+    """Split an assignment into gift loops for the chain-style reveal.
 
-    Each loop is listed in giving order (A gives to B, ..., last gives to first), starting
-    from whoever comes first in the assignment.
+    Args:
+        assignment: A {giver: giftee} dict that is a full permutation of the people,
+            e.g. the result of `find_matching`.
+
+    Returns:
+        A list of loops, e.g. [[A, B, C], [D, E, F, G]]. Each loop is in giving order
+        (A gives to B, B to C, and the last person gives back to the first). Loops are
+        ordered by, and each starts from, whoever comes first in `assignment`.
     """
     seen: set[Hashable] = set()
     result = []
