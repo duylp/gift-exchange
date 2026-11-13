@@ -46,7 +46,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
         giftee = db.get_giftee(conn, event.id, email) if email and not event.is_open else None
 
     ui.page_title(event.title)
-    with page_frame():
+    with page_frame(theme=event.theme):
         _header(event, count)
         _how_it_works(event)
         if email is None:
@@ -176,7 +176,7 @@ def _closed() -> None:
 
 
 def _header(event: db.Event, count: int) -> None:
-    ui.label(event.title).classes("text-2xl font-bold")
+    ui.label(event.title).classes("theme-title text-2xl font-bold")
     joined = "Be the first to join!" if count == 0 else f"{count} joined"
     if not event.is_open:
         joined = f"{count} taking part"

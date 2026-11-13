@@ -20,6 +20,7 @@ from gift_exchange.ui.dbconn import open_db
 from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.login import login_url
 from gift_exchange.ui.session import current_admin, current_email
+from gift_exchange.ui.themes import theme_options
 
 
 def _guard(request: Request) -> RedirectResponse | None:
@@ -90,6 +91,7 @@ def _new_event_form() -> None:
         .classes("w-full")
     )
     budget = ui.number("Budget (S$)", value=30, min=1, precision=0).props("outlined")
+    theme = _theme_select(db.THEMES[0])
     get_sections = _question_editor([])
 
     def create() -> None:
@@ -108,6 +110,7 @@ def _new_event_form() -> None:
                     title.value,
                     amount,
                     get_sections(),
+                    theme.value,
                 )
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
@@ -179,6 +182,13 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
     return None
 
 
+def _theme_select(value: str) -> ui.select:
+    select = ui.select(theme_options(), value=value, label="Theme").props("outlined")
+    select.classes("w-full")
+    select.props["hint"] = "Look of the event page. Can change any time."
+    return select
+
+
 def _share_link(event: db.Event) -> None:
     url = f"{get_settings().base_url}/e/{event.slug}"
     with ui.row().classes("w-full items-center gap-2"):
@@ -195,6 +205,7 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
     if not event.is_open:
         budget.props("readonly")
         budget.props["hint"] = "🔒 Budget is fixed after the draw."
+    theme = _theme_select(event.theme)
 
     questions_locked = has_people or not event.is_open
     if questions_locked:
@@ -210,7 +221,7 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
         new_sections = list(event.sections) if questions_locked else get_sections()
         try:
             with open_db() as conn:
-                db.update_event(conn, event.id, title.value, amount, new_sections)
+                db.update_event(conn, event.id, title.value, amount, new_sections, theme.value)
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
             return
