@@ -1,4 +1,4 @@
-"""Forward-only SQL migration engine. Design: docs/migrations.md."""
+"""Forward-only SQL migration engine for SQLite. See README.md in this package."""
 
 import hashlib
 import re
@@ -7,9 +7,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gift_exchange.core.db import connect
-
-MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 SNAPSHOTS_TO_KEEP = 5
 
 _FILENAME = re.compile(r"^(\d{4})_([a-z0-9_]+)\.sql$")
@@ -68,7 +65,7 @@ class Status:
     pending: tuple[Migration, ...]
 
 
-def load_migrations(migrations_dir: Path = MIGRATIONS_DIR) -> list[Migration]:
+def load_migrations(migrations_dir: Path) -> list[Migration]:
     """Read and validate all migration files in a folder.
 
     Args:
@@ -116,12 +113,12 @@ def load_migrations(migrations_dir: Path = MIGRATIONS_DIR) -> list[Migration]:
     return migrations
 
 
-def migration_status(conn: sqlite3.Connection, migrations_dir: Path = MIGRATIONS_DIR) -> Status:
+def migration_status(conn: sqlite3.Connection, migrations_dir: Path) -> Status:
     """Compare the database with the migration files, running all safety checks.
 
     Args:
-        conn: Connection from `db.connect` (autocommit mode). The tracking table is
-            created if missing.
+        conn: Connection in autocommit mode (`isolation_level=None`), e.g. from
+            `connect`. The tracking table is created if missing.
         migrations_dir: Folder holding the migration files.
 
     Returns:
@@ -130,8 +127,10 @@ def migration_status(conn: sqlite3.Connection, migrations_dir: Path = MIGRATIONS
     Raises:
         MigrationError: If the files are invalid (see `load_migrations`), the database has
             a version with no file (database ahead of code), or an applied migration's
-            file has been edited since (checksum mismatch).
+            file has been edited since (checksum mismatch); or `conn` is not in
+            autocommit mode.
     """
+    _check_connection(conn)
     migrations = load_migrations(migrations_dir)
     conn.execute(_TRACKING_TABLE)
     rows = conn.execute("SELECT version, checksum FROM schema_migrations ORDER BY version")
@@ -159,13 +158,14 @@ def migration_status(conn: sqlite3.Connection, migrations_dir: Path = MIGRATIONS
     )
 
 
-def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path = MIGRATIONS_DIR) -> list[int]:
+def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path) -> list[int]:
     """Apply all pending migrations, each in its own transaction.
 
     Does not take a snapshot; use `migrate_database` for a database file.
 
     Args:
-        conn: Connection from `db.connect` (autocommit mode, not inside a transaction).
+        conn: Connection in autocommit mode (`isolation_level=None`, e.g. from `connect`),
+            not inside a transaction.
         migrations_dir: Folder holding the migration files.
 
     Returns:
@@ -176,8 +176,7 @@ def apply_migrations(conn: sqlite3.Connection, migrations_dir: Path = MIGRATIONS
             fails or leaves a foreign-key violation. Migrations before the failing one stay
             applied; the failing one is rolled back completely.
     """
-    if conn.in_transaction:
-        raise MigrationError("apply_migrations needs a connection with no open transaction")
+    _check_connection(conn)
     applied = []
     for migration in migration_status(conn, migrations_dir).pending:
         _apply_one(conn, migration)
@@ -245,11 +244,11 @@ def snapshot(db_path: Path, version: int, keep: int = SNAPSHOTS_TO_KEEP) -> Path
     return dest
 
 
-def migrate_database(db_path: Path, migrations_dir: Path = MIGRATIONS_DIR) -> list[int]:
+def migrate_database(db_path: Path, migrations_dir: Path) -> list[int]:
     """Bring a database file up to date: safety checks → snapshot → apply pending.
 
-    This is what app startup and `python -m gift_exchange.migrate up` call. A snapshot is
-    only taken if something is pending and the file already existed.
+    The usual entry point for an app's startup and for `python -m sqlite_migrate up`.
+    A snapshot is only taken if something is pending and the file already existed.
 
     Args:
         db_path: The database file. Created (empty) if it doesn't exist.
@@ -272,6 +271,33 @@ def migrate_database(db_path: Path, migrations_dir: Path = MIGRATIONS_DIR) -> li
         return apply_migrations(conn, migrations_dir)
     finally:
         conn.close()
+
+
+def connect(db_path: Path | str) -> sqlite3.Connection:
+    """Open a connection in the mode the engine needs.
+
+    Args:
+        db_path: Path to the SQLite file, or ":memory:". The parent directory is created
+            if it doesn't exist.
+
+    Returns:
+        A connection in autocommit mode (`isolation_level=None`) with foreign keys on.
+    """
+    if str(db_path) != ":memory:":
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path, isolation_level=None)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def _check_connection(conn: sqlite3.Connection) -> None:
+    if conn.isolation_level is not None:
+        raise MigrationError(
+            "The connection must be in autocommit mode: open it with isolation_level=None "
+            "(or use sqlite_migrate.connect)."
+        )
+    if conn.in_transaction:
+        raise MigrationError("The connection has an open transaction; commit or roll back first.")
 
 
 def _utc_now() -> datetime:

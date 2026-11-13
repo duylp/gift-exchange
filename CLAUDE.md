@@ -14,7 +14,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **DNS / registrar:** Cloudflare (registrar + DNS). App record is DNS-only (proxy off) so Caddy terminates TLS.
 - **Repo:** public on GitHub. Secrets never committed.
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Everything about an event lives in the DB and is managed via the admin page.
-- **Migrations:** own minimal engine — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. Full design: `docs/migrations.md`.
+- **Migrations:** own minimal engine `sqlite_migrate` — forward-only numbered plain-SQL scripts, auto-applied at startup; a DB snapshot is taken before every run for rollback. No Alembic, no ORM — the schema exists only in the SQL files. App usage: `docs/migrations.md`; engine design: `src/sqlite_migrate/README.md`.
 - **Backups:** SQLite → Cloudflare R2. Not needed in the first stage of development.
 - **Auth:** magic link (itsdangerous) → long-lived signed session cookie (~60 days). A plain route `/auth?token=…` verifies the link and sets an itsdangerous-signed cookie holding `user_id`; pages read it from the request. Do not use NiceGUI `app.storage.user` (it stores state in `.nicegui/` files outside the DB).
 - **Email:** `httpx` POST to the Resend API (no SDK). Dev backend prints the link to the console.
@@ -39,6 +39,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 
 ## Code conventions
 - **Layout:** `src/gift_exchange/` package with `core/` (plain Python: matching, db, auth, email) and `ui/` (NiceGUI pages only); `src/gift_exchange/migrations/` (SQL files, shipped with the package); `tests/` at repo root.
+- **`src/sqlite_migrate/`** is a standalone package meant to become its own repo later: it must never import `gift_exchange` (a test enforces this), and its tests live in `tests/sqlite_migrate/`.
 - **DB access:** stdlib `sqlite3`; all queries in `core/` DB module(s), returning dataclasses. UI never writes SQL.
 - **Types:** type hints everywhere; no type checker in v1.
 - **Docstrings:** Google style (`Args:` / `Returns:` / `Raises:`) on public functions and classes, explaining every parameter.

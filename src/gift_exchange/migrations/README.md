@@ -1,1 +1,2 @@
-SQL migrations, applied in order at app startup. Rules and design: `docs/migrations.md`.
+SQL migrations for gift-exchange, applied in order at app startup by `sqlite_migrate`.
+Rules: `src/sqlite_migrate/README.md`; app usage: `docs/migrations.md`.

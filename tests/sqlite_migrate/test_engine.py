@@ -2,12 +2,10 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-
-from gift_exchange.core.db import connect
-from gift_exchange.core.migrations import (
-    MIGRATIONS_DIR,
+from sqlite_migrate import (
     MigrationError,
     apply_migrations,
+    connect,
     load_migrations,
     migrate_database,
     migration_status,
@@ -36,15 +34,6 @@ def write(mdir: Path, name: str, sql: str) -> Path:
 def tables(conn: sqlite3.Connection) -> set[str]:
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     return {r[0] for r in rows} - {"schema_migrations"}
-
-
-# --- the real migrations folder ----------------------------------------------------
-
-
-def test_real_migrations_apply_cleanly_and_are_idempotent(conn: sqlite3.Connection) -> None:
-    expected = [m.version for m in load_migrations(MIGRATIONS_DIR)]
-    assert apply_migrations(conn, MIGRATIONS_DIR) == expected
-    assert apply_migrations(conn, MIGRATIONS_DIR) == []
 
 
 # --- applying ---------------------------------------------------------------------
@@ -131,6 +120,11 @@ def test_refuses_inside_open_transaction(mdir: Path, conn: sqlite3.Connection) -
     conn.execute("BEGIN")
     with pytest.raises(MigrationError, match="open transaction"):
         apply_migrations(conn, mdir)
+
+
+def test_refuses_non_autocommit_connection(mdir: Path) -> None:
+    with pytest.raises(MigrationError, match="autocommit"):
+        apply_migrations(sqlite3.connect(":memory:"), mdir)
 
 
 # --- file validation ----------------------------------------------------------------

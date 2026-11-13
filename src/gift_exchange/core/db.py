@@ -3,6 +3,9 @@
 import sqlite3
 from pathlib import Path
 
+MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
+"""The app's SQL migration files, run by the `sqlite_migrate` engine."""
+
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open a connection configured the way the whole app expects.
