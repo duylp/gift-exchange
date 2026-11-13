@@ -76,51 +76,60 @@ def login_page(request: Request, next: str = "/", error: str = "") -> RedirectRe
         ui.label("Log in 🎁").classes("text-2xl font-bold")
         if error in _LINK_ERRORS:
             ui.label(_LINK_ERRORS[error]).classes("text-red-700")
-
-        form = ui.column().classes("w-full gap-3")
-        sent = ui.column().classes("w-full gap-2")
-        sent.set_visibility(False)
-
-        with form:
-            ui.label("Enter your email and we'll send you a login link. No password needed.")
-            email_input = ui.input("Email").props("type=email autofocus outlined").classes("w-full")
-            button = ui.button("Send me a link").classes("w-full")
-
-        async def submit() -> None:
-            email = (email_input.value or "").strip().lower()
-            if "@" not in email or "." not in email.split("@")[-1]:
-                ui.notify("Please enter a valid email address.", type="warning")
-                return
-            if not _cooldown.allow(email):
-                ui.notify("A link was just sent to that address. Wait a minute and try again.")
-                return
-            settings = get_settings()
-            token = make_login_token(settings.secret_key, email)
-            link = f"{settings.base_url}/auth?" + urlencode({"token": token, "next": target})
-            button.props("loading")
-            try:
-                await _sender().send(login_email(email, link))
-            except EmailError:
-                log.exception("Login email to %s failed", email)
-                ui.notify("Sorry, we couldn't send the email. Try again later.", type="negative")
-                return
-            finally:
-                button.props(remove="loading")
-            form.set_visibility(False)
-            with sent:
-                sent.clear()
-                ui.label(f"Check your email ({email}) 📬").classes("text-lg font-semibold")
-                ui.label(
-                    "Tap the link in it to log in. It works for 15 minutes. "
-                    "Not there? Check your spam folder, or check the address and try again."
-                )
-                ui.button("Use a different email", on_click=lambda: _reset()).props("flat")
-            sent.set_visibility(True)
-
-        def _reset() -> None:
-            sent.set_visibility(False)
-            form.set_visibility(True)
-
-        button.on_click(submit)
-        email_input.on("keydown.enter", submit)
+        login_form(target)
     return None
+
+
+def login_form(next_path: str) -> None:
+    """Email form that sends a magic link returning to `next_path`. Used by /login and pages.
+
+    Args:
+        next_path: Where the login link should land afterwards (made same-site-only).
+    """
+    target = safe_next(next_path)
+    form = ui.column().classes("w-full gap-3")
+    sent = ui.column().classes("w-full gap-2")
+    sent.set_visibility(False)
+
+    with form:
+        ui.label("Enter your email and we'll send you a login link. No password needed.")
+        email_input = ui.input("Email").props("type=email autofocus outlined").classes("w-full")
+        button = ui.button("Send me a link").classes("w-full")
+
+    async def submit() -> None:
+        email = (email_input.value or "").strip().lower()
+        if "@" not in email or "." not in email.split("@")[-1]:
+            ui.notify("Please enter a valid email address.", type="warning")
+            return
+        if not _cooldown.allow(email):
+            ui.notify("A link was just sent to that address. Wait a minute and try again.")
+            return
+        settings = get_settings()
+        token = make_login_token(settings.secret_key, email)
+        link = f"{settings.base_url}/auth?" + urlencode({"token": token, "next": target})
+        button.props("loading")
+        try:
+            await _sender().send(login_email(email, link))
+        except EmailError:
+            log.exception("Login email to %s failed", email)
+            ui.notify("Sorry, we couldn't send the email. Try again later.", type="negative")
+            return
+        finally:
+            button.props(remove="loading")
+        form.set_visibility(False)
+        with sent:
+            sent.clear()
+            ui.label(f"Check your email ({email}) 📬").classes("text-lg font-semibold")
+            ui.label(
+                "Tap the link in it to log in. It works for 15 minutes. "
+                "Not there? Check your spam folder, or check the address and try again."
+            )
+            ui.button("Use a different email", on_click=lambda: _reset()).props("flat")
+        sent.set_visibility(True)
+
+    def _reset() -> None:
+        sent.set_visibility(False)
+        form.set_visibility(True)
+
+    button.on_click(submit)
+    email_input.on("keydown.enter", submit)

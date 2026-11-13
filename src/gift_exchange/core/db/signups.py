@@ -130,6 +130,13 @@ def list_participants(conn: sqlite3.Connection, event_id: int) -> list[Participa
     return [participant_from_row(r) for r in rows]
 
 
+def count_participants(conn: sqlite3.Connection, event_id: int) -> int:
+    """How many people have joined an event (safe to show publicly: just a number)."""
+    return conn.execute(
+        "SELECT COUNT(*) FROM participants WHERE event_id = ?", (event_id,)
+    ).fetchone()[0]
+
+
 def remove_participant(conn: sqlite3.Connection, participant_id: int) -> None:
     """Remove someone from an event before matching. Their exclusions go too.
 

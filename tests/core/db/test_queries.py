@@ -273,3 +273,10 @@ def test_matched_event_cannot_be_deleted(conn: sqlite3.Connection, event: q.Even
     q.run_matching(conn, event.id)
     with pytest.raises(q.EventClosed):
         q.delete_event(conn, event.id)
+
+
+def test_count_participants(conn: sqlite3.Connection, event: q.Event) -> None:
+    assert q.count_participants(conn, event.id) == 0
+    signup(conn, event, "ann")
+    signup(conn, event, "bob")
+    assert q.count_participants(conn, event.id) == 2
