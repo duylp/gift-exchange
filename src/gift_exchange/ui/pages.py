@@ -12,6 +12,8 @@ def index(request: Request) -> None:
         ui.label("Gift exchange 🎁").classes("text-2xl font-bold")
         if email:
             ui.label(f"Logged in as {email}" + (" (organiser)" if current_admin(request) else ""))
+            if current_admin(request):
+                ui.link("Manage events", "/admin")
             ui.link("Log out", "/logout")
         else:
             ui.label("Open your event's link to join, or log in.")
