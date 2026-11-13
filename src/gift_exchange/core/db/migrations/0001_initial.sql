@@ -10,7 +10,8 @@ CREATE TABLE events (
                CHECK (slug GLOB '[a-z0-9]*' AND slug NOT GLOB '*[^a-z0-9-]*'),
     title      TEXT NOT NULL,
     budget     INTEGER NOT NULL CHECK (budget > 0),  -- whole S$
-    -- JSON array of question strings; locked once anyone has signed up (trigger below)
+    -- JSON array of question sections [{"title", "questions": [...], "hidden"}]
+    -- (core/db/models.py); locked once anyone has signed up (trigger below)
     questions  TEXT NOT NULL DEFAULT '[]'
                CHECK (json_valid(questions) AND json_type(questions) = 'array'),
     status     TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'matched')),
@@ -24,7 +25,7 @@ CREATE TABLE participants (
     email      TEXT NOT NULL COLLATE NOCASE,  -- lowercased; identifies the person (login)
     name       TEXT NOT NULL,                 -- real name (organiser view, reveal)
     nickname   TEXT NOT NULL COLLATE NOCASE,  -- anonymous name shown to their Santa
-    -- JSON array of answer strings, in the same order as events.questions
+    -- JSON array of answer strings: every question across the sections, in order
     answers    TEXT NOT NULL DEFAULT '[]'
                CHECK (json_valid(answers) AND json_type(answers) = 'array'),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),

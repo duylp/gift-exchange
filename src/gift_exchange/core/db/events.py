@@ -3,13 +3,19 @@
 import sqlite3
 from collections.abc import Sequence
 
-from gift_exchange.core.db._util import clean_list, encode_list, require
+from gift_exchange.core.db._util import require
 from gift_exchange.core.db.errors import EventClosed, NotFound, QuestionsLocked, SlugTaken
-from gift_exchange.core.db.models import Event, event_from_row
+from gift_exchange.core.db.models import (
+    Event,
+    Section,
+    clean_sections,
+    encode_sections,
+    event_from_row,
+)
 
 
 def create_event(
-    conn: sqlite3.Connection, slug: str, title: str, budget: int, questions: Sequence[str]
+    conn: sqlite3.Connection, slug: str, title: str, budget: int, sections: Sequence[Section]
 ) -> Event:
     """Create an event, open for sign-ups.
 
@@ -18,7 +24,8 @@ def create_event(
         slug: URL part: lowercase letters, digits and hyphens, e.g. "xmas-2026".
         title: Display title.
         budget: Gift budget in whole S$ (> 0).
-        questions: Clue questions; blank entries are dropped, the rest are stripped.
+        sections: Clue question groups. Text is stripped; blank questions, and sections
+            left with none, are dropped.
 
     Returns:
         The new event.
@@ -31,7 +38,7 @@ def create_event(
     try:
         cur = conn.execute(
             "INSERT INTO events (slug, title, budget, questions) VALUES (?, ?, ?, ?)",
-            (slug, title.strip(), budget, encode_list(clean_list(questions))),
+            (slug, title.strip(), budget, encode_sections(clean_sections(sections))),
         )
     except sqlite3.IntegrityError as exc:
         if "UNIQUE" in str(exc):
@@ -93,23 +100,27 @@ def list_events_joined_by(conn: sqlite3.Connection, email: str) -> list[Event]:
 
 
 def update_event(
-    conn: sqlite3.Connection, event_id: int, title: str, budget: int, questions: Sequence[str]
+    conn: sqlite3.Connection,
+    event_id: int,
+    title: str,
+    budget: int,
+    sections: Sequence[Section],
 ) -> Event:
-    """Change an event's title, budget and questions.
+    """Change an event's title, budget and clue question sections.
 
     Args:
         conn: Database connection.
         event_id: The event.
         title: New title.
         budget: New budget in whole S$ (> 0).
-        questions: New questions (cleaned like `create_event`). Passing the current
-            questions unchanged is always fine, even after people have signed up.
+        sections: New sections (cleaned like `create_event`). Passing the current
+            sections unchanged is always fine, even after people have signed up.
 
     Returns:
         The updated event.
 
     Raises:
-        QuestionsLocked: If the questions differ and someone has already signed up.
+        QuestionsLocked: If the sections differ and someone has already signed up.
         EventClosed: If the budget differs and the event has been matched (Santas may
             already have bought gifts). The title can always change.
         NotFound: If there is no such event.
@@ -119,7 +130,7 @@ def update_event(
     try:
         cur = conn.execute(
             "UPDATE events SET title = ?, budget = ?, questions = ? WHERE id = ?",
-            (title.strip(), budget, encode_list(clean_list(questions)), event_id),
+            (title.strip(), budget, encode_sections(clean_sections(sections)), event_id),
         )
     except sqlite3.IntegrityError as exc:
         if "locked" in str(exc):

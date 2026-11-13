@@ -4,10 +4,6 @@ import json
 from collections.abc import Sequence
 
 
-def clean_list(items: Sequence[str]) -> list[str]:
-    return [s.strip() for s in items if s.strip()]
-
-
 def encode_list(items: Sequence[str]) -> str:
     return json.dumps(list(items), ensure_ascii=False)
 

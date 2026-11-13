@@ -2,7 +2,24 @@
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Section:
+    """A group of clue questions, e.g. "About you", "The gift", "For the reveal".
+
+    Attributes:
+        title: Heading shown above the questions ("" for none).
+        questions: The questions, in order.
+        hidden: If True, the answers are kept for the party reveal and never shown to the
+            Santa (e.g. "What should your Santa say when handing you the gift?").
+    """
+
+    title: str
+    questions: tuple[str, ...]
+    hidden: bool = False
 
 
 @dataclass(frozen=True)
@@ -14,7 +31,7 @@ class Event:
         slug: URL part, e.g. "xmas-2026" for /e/xmas-2026.
         title: Display title.
         budget: Gift budget in whole S$.
-        questions: Clue questions asked at sign-up, in order.
+        sections: Clue question groups asked at sign-up, in order.
         status: "open" (sign-ups open) or "matched" (final).
         matched_at: UTC ISO-8601 time matching ran, or None.
     """
@@ -23,13 +40,18 @@ class Event:
     slug: str
     title: str
     budget: int
-    questions: tuple[str, ...]
+    sections: tuple[Section, ...]
     status: str
     matched_at: str | None
 
     @property
     def is_open(self) -> bool:
         return self.status == "open"
+
+    @property
+    def questions(self) -> tuple[str, ...]:
+        """Every question across the sections, in order (answers line up with these)."""
+        return tuple(q for s in self.sections for q in s.questions)
 
 
 @dataclass(frozen=True)
@@ -42,7 +64,7 @@ class Participant:
         email: Lowercased email; identifies the person (they log in with it).
         name: Real name (organiser view and reveal only).
         nickname: Anonymous name shown to their Santa.
-        answers: Answers in the same order as the event's questions.
+        answers: Answers in the same order as the event's questions (all sections).
     """
 
     id: int
@@ -59,12 +81,13 @@ class Giftee:
 
     Attributes:
         nickname: The giftee's anonymous nickname (never their real name).
-        clues: (question, answer) pairs, in question order.
+        clues: (section title, ((question, answer), ...)) per visible section, in order.
+            Hidden (reveal-only) sections are left out.
         budget: The event's gift budget in whole S$.
     """
 
     nickname: str
-    clues: tuple[tuple[str, str], ...]
+    clues: tuple[tuple[str, tuple[tuple[str, str], ...]], ...]
     budget: int
 
 
@@ -79,7 +102,7 @@ def event_from_row(row: sqlite3.Row) -> Event:
         slug=row["slug"],
         title=row["title"],
         budget=row["budget"],
-        questions=tuple(json.loads(row["questions"])),
+        sections=decode_sections(row["questions"]),
         status=row["status"],
         matched_at=row["matched_at"],
     )
@@ -94,3 +117,41 @@ def participant_from_row(row: sqlite3.Row) -> Participant:
         nickname=row["nickname"],
         answers=tuple(json.loads(row["answers"])),
     )
+
+
+def decode_sections(text: str) -> tuple[Section, ...]:
+    """Parse the `events.questions` JSON: [{"title", "questions", "hidden"}, ...]."""
+    return tuple(
+        Section(s["title"], tuple(s["questions"]), bool(s.get("hidden", False)))
+        for s in json.loads(text)
+    )
+
+
+def encode_sections(sections: Sequence[Section]) -> str:
+    """The `events.questions` JSON for these sections (see `decode_sections`)."""
+    return json.dumps(
+        [{"title": s.title, "questions": list(s.questions), "hidden": s.hidden} for s in sections],
+        ensure_ascii=False,
+    )
+
+
+def clean_sections(sections: Sequence[Section]) -> list[Section]:
+    """Strip text, drop blank questions, and drop sections left with no questions."""
+    cleaned = []
+    for s in sections:
+        questions = tuple(q.strip() for q in s.questions if q.strip())
+        if questions:
+            cleaned.append(Section(s.title.strip(), questions, s.hidden))
+    return cleaned
+
+
+def pair_answers(
+    sections: Sequence[Section], answers: Sequence[str]
+) -> list[tuple[Section, tuple[tuple[str, str], ...]]]:
+    """Split a flat answer list back into (section, ((question, answer), ...)) groups."""
+    groups, i = [], 0
+    for s in sections:
+        n = len(s.questions)
+        groups.append((s, tuple(zip(s.questions, answers[i : i + n], strict=False))))
+        i += n
+    return groups

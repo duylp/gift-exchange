@@ -7,7 +7,7 @@ from sqlite_migrate import apply_migrations
 from gift_exchange.core import db as q
 from gift_exchange.core.matching import MatchingError, Verdict
 
-QUESTIONS = ["Hobbies?", "Favourite colour?"]
+QUESTIONS = [q.Section("", ("Hobbies?", "Favourite colour?"))]
 
 
 @pytest.fixture
@@ -32,8 +32,11 @@ def signup(conn: sqlite3.Connection, event: q.Event, who: str) -> q.Participant:
 
 
 def test_create_and_get_event(conn: sqlite3.Connection) -> None:
-    e = q.create_event(conn, "xmas-2026", " Xmas ", 30, [" Hobbies? ", "", "Colour?"])
+    e = q.create_event(
+        conn, "xmas-2026", " Xmas ", 30, [q.Section(" About ", (" Hobbies? ", "", "Colour?"))]
+    )
     assert e.title == "Xmas" and e.questions == ("Hobbies?", "Colour?") and e.is_open
+    assert e.sections == (q.Section("About", ("Hobbies?", "Colour?")),)
     assert q.get_event_by_slug(conn, "xmas-2026") == e
     assert q.list_events(conn) == [e]
 
@@ -61,13 +64,13 @@ def test_event_not_found(conn: sqlite3.Connection) -> None:
 def test_update_event_questions_locked_after_signup(
     conn: sqlite3.Connection, event: q.Event
 ) -> None:
-    q.update_event(conn, event.id, "New title", 40, ["Only one?", "Two?"])
+    q.update_event(conn, event.id, "New title", 40, [q.Section("", ("Only one?", "Two?"))])
     signup(conn, event, "ann")
     # Same questions + other changes: fine.
-    e = q.update_event(conn, event.id, "Newer", 50, ["Only one?", "Two?"])
+    e = q.update_event(conn, event.id, "Newer", 50, [q.Section("", ("Only one?", "Two?"))])
     assert (e.title, e.budget) == ("Newer", 50)
     with pytest.raises(q.QuestionsLocked):
-        q.update_event(conn, event.id, "Newer", 50, ["Changed?", "Two?"])
+        q.update_event(conn, event.id, "Newer", 50, [q.Section("", ("Changed?", "Two?"))])
 
 
 # --- sign-ups --------------------------------------------------------------------------
@@ -139,7 +142,7 @@ def test_exclusion_errors(conn: sqlite3.Connection, event: q.Event) -> None:
     ann = signup(conn, event, "ann")
     with pytest.raises(ValueError, match="different"):
         q.add_exclusion(conn, event.id, ann.id, ann.id)
-    other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
+    other = q.create_event(conn, "other", "Other", 10, [q.Section("", ("a?", "b?"))])
     zed = signup(conn, other, "zed")
     with pytest.raises(ValueError, match="this event"):
         q.add_exclusion(conn, event.id, ann.id, zed.id)
@@ -170,7 +173,7 @@ def test_full_flow(conn: sqlite3.Connection, event: q.Event) -> None:
     for p in people:
         g = q.get_giftee(conn, event.id, p.email)
         assert g is not None and g.nickname != p.nickname and g.budget == 30
-        assert g.clues == (("Hobbies?", "a"), ("Favourite colour?", "b"))
+        assert g.clues == (("", (("Hobbies?", "a"), ("Favourite colour?", "b"))),)
         received.append(g.nickname)
     assert sorted(received) == sorted(nicknames)  # everyone receives exactly once
     # The excluded pair never gives to each other.
@@ -258,7 +261,7 @@ def test_budget_fixed_after_match_but_title_editable(
 def test_delete_event(conn: sqlite3.Connection, event: q.Event) -> None:
     a, b, _ = (signup(conn, event, n) for n in ("ann", "bob", "cat"))
     q.add_exclusion(conn, event.id, a.id, b.id)
-    other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
+    other = q.create_event(conn, "other", "Other", 10, [q.Section("", ("a?", "b?"))])
     signup(conn, other, "ann")  # same person in another event
     q.delete_event(conn, event.id)
     with pytest.raises(q.NotFound):
@@ -283,7 +286,7 @@ def test_count_participants(conn: sqlite3.Connection, event: q.Event) -> None:
 
 
 def test_list_events_joined_by(conn: sqlite3.Connection, event: q.Event) -> None:
-    other = q.create_event(conn, "other", "Other", 10, ["a?", "b?"])
+    other = q.create_event(conn, "other", "Other", 10, [q.Section("", ("a?", "b?"))])
     q.create_event(conn, "not-joined", "Not joined", 10, [])
     signup(conn, event, "ann")
     signup(conn, other, "ann")
@@ -298,3 +301,51 @@ def test_list_events_joined_by(conn: sqlite3.Connection, event: q.Event) -> None
 
 def test_get_event_by_slug_ignores_case(conn: sqlite3.Connection, event: q.Event) -> None:
     assert q.get_event_by_slug(conn, " Xmas-2026 ").id == event.id
+
+
+def test_sections_cleaned_and_kept_in_order(conn: sqlite3.Connection) -> None:
+    e = q.create_event(
+        conn,
+        "sections",
+        "Sections",
+        30,
+        [
+            q.Section("About you", ("Hobbies?",)),
+            q.Section("Empty", ("", "  ")),  # dropped: no questions left
+            q.Section(" Reveal ", ("Say?", "Pose?"), hidden=True),
+        ],
+    )
+    assert e.sections == (
+        q.Section("About you", ("Hobbies?",)),
+        q.Section("Reveal", ("Say?", "Pose?"), hidden=True),
+    )
+    assert e.questions == ("Hobbies?", "Say?", "Pose?")
+
+
+def test_hidden_sections_never_reach_the_santa(conn: sqlite3.Connection) -> None:
+    sections = [
+        q.Section("About you", ("Hobbies?",)),
+        q.Section("Reveal", ("Say?",), hidden=True),
+        q.Section("The gift", ("Colour?",)),
+    ]
+    event = q.create_event(conn, "hidden", "Hidden", 30, sections)
+    people = [
+        q.join_event(conn, event.id, f"{n}@x.com", n, f"{n}-nick", ["fun", "SECRET", "red"])
+        for n in ("ann", "bob", "cat")
+    ]
+    q.run_matching(conn, event.id, random.Random(1))
+    for p in people:
+        g = q.get_giftee(conn, event.id, p.email)
+        assert g.clues == (
+            ("About you", (("Hobbies?", "fun"),)),
+            ("The gift", (("Colour?", "red"),)),
+        )
+        assert "SECRET" not in repr(g)
+
+
+def test_pair_answers_splits_by_section() -> None:
+    sections = [q.Section("A", ("1?", "2?")), q.Section("B", ("3?",), hidden=True)]
+    assert q.pair_answers(sections, ["x", "y", "z"]) == [
+        (sections[0], (("1?", "x"), ("2?", "y"))),
+        (sections[1], (("3?", "z"),)),
+    ]

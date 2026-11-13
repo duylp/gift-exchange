@@ -7,7 +7,7 @@ Match secrecy: these pages never show who got whom — only counts.
 """
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
@@ -90,7 +90,7 @@ def _new_event_form() -> None:
         .classes("w-full")
     )
     budget = ui.number("Budget (S$)", value=30, min=1, precision=0).props("outlined")
-    get_questions = _question_editor([])
+    get_sections = _question_editor([])
 
     def create() -> None:
         results = [slug.validate(), title.validate()]
@@ -107,7 +107,7 @@ def _new_event_form() -> None:
                     slug.value.strip().lower(),
                     title.value,
                     amount,
-                    get_questions(),
+                    get_sections(),
                 )
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
@@ -198,19 +198,19 @@ def _settings_form(event: db.Event, has_people: bool, reload) -> None:
 
     questions_locked = has_people or not event.is_open
     if questions_locked:
-        _question_list(event.questions)
+        _question_list(event.sections)
     else:
-        get_questions = _question_editor(event.questions)
+        get_sections = _question_editor(event.sections)
 
     def save() -> None:
         amount = _whole_number(budget.value)
         if amount is None:
             ui.notify("Budget must be a whole number above 0.", type="warning")
             return
-        new_questions = list(event.questions) if questions_locked else get_questions()
+        new_sections = list(event.sections) if questions_locked else get_sections()
         try:
             with open_db() as conn:
-                db.update_event(conn, event.id, title.value, amount, new_questions)
+                db.update_event(conn, event.id, title.value, amount, new_sections)
         except (db.DbError, ValueError) as exc:
             ui.notify(str(exc), type="negative")
             return
@@ -377,38 +377,50 @@ def _delete_button(event: db.Event) -> None:
 # --- clue questions ---------------------------------------------------------------------------
 
 
-def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
-    """Editable list of clue questions: one box each, reorder, delete, add.
+def _question_editor(initial: Sequence[db.Section]) -> Callable[[], list[db.Section]]:
+    """Editable clue questions, grouped in sections (one box per question).
 
-    The list lives in a local variable only while the form is open; nothing is saved until
-    the form's own button is pressed.
+    Sections and questions can be added, reordered and removed; Enter in a question adds
+    one below it. A section can be hidden from Santas (kept for the party reveal). The draft
+    lives in a local variable only while the form is open; nothing is saved until the
+    form's own button is pressed.
 
     Args:
-        initial: The questions to start with, in order.
+        initial: The sections to start with, in order (none → one empty section).
 
     Returns:
-        A function giving the current questions (trimmed, blanks dropped), for the save
-        handler to call.
+        A function giving the current sections, for the save handler to call (the db
+        layer drops blank questions and empty sections).
     """
-    questions = list(initial)
-    focus_index: list[int | None] = [None]  # row to focus after the next refresh
+    sections = [
+        {"title": s.title, "hidden": s.hidden, "questions": list(s.questions)} for s in initial
+    ] or [{"title": "", "hidden": False, "questions": []}]
+    focus: list[tuple[int, int] | None] = [None]  # question box to focus after a refresh
 
-    def insert(index: int) -> None:
-        questions.insert(index, "")
-        focus_index[0] = index
+    def add_question(si: int, qi: int) -> None:
+        sections[si]["questions"].insert(qi, "")
+        focus[0] = (si, qi)
         rows.refresh()
 
-    def remove(index: int) -> None:
-        del questions[index]
+    def remove_question(si: int, qi: int) -> None:
+        del sections[si]["questions"][qi]
         rows.refresh()
 
-    def move(index: int, step: int) -> None:
-        other = index + step
-        questions[index], questions[other] = questions[other], questions[index]
+    def move_question(si: int, qi: int, step: int) -> None:
+        _swap(sections[si]["questions"], qi, qi + step)
         rows.refresh()
 
-    def set_text(index: int, text: str) -> None:
-        questions[index] = text
+    def add_section() -> None:
+        sections.append({"title": "", "hidden": False, "questions": []})
+        rows.refresh()
+
+    def remove_section(si: int) -> None:
+        del sections[si]
+        rows.refresh()
+
+    def move_section(si: int, step: int) -> None:
+        _swap(sections, si, si + step)
+        rows.refresh()
 
     ui.label("Clue questions").classes("font-medium")
     ui.label("Everyone answers these when they join; their Santa sees the answers.").classes(
@@ -417,51 +429,95 @@ def _question_editor(initial: list[str]) -> Callable[[], list[str]]:
 
     @ui.refreshable
     def rows() -> None:
-        if not questions:
-            ui.label("No questions yet.").classes("text-sm text-gray-600")
-        last = len(questions) - 1
-        for i, text in enumerate(questions):
-            with ui.row().classes("w-full items-center no-wrap gap-0"):
-                box = (
+        number = 0
+        for si, section in enumerate(sections):
+            with ui.card().classes("w-full gap-2").props("flat bordered"):
+                with ui.row().classes("w-full items-center no-wrap gap-0"):
                     ui.input(
-                        placeholder=f"Question {i + 1}",
-                        value=text,
-                        on_change=lambda e, i=i: set_text(i, e.value),
+                        placeholder="Section title (optional), e.g. About you",
+                        value=section["title"],
+                        on_change=lambda e, s=section: s.__setitem__("title", e.value),
+                    ).props("dense").classes("grow font-semibold")
+                    _move_remove_buttons(
+                        len(sections),
+                        si,
+                        lambda step, si=si: move_section(si, step),
+                        lambda si=si: remove_section(si),
+                        "section",
                     )
-                    .props(f'outlined dense prefix="{i + 1}."')
-                    .classes("grow")
-                    .on("keydown.enter", lambda i=i: insert(i + 1))
-                )
-                if focus_index[0] == i:
-                    box.props("autofocus")
-                up = ui.button(icon="arrow_upward", on_click=lambda i=i: move(i, -1))
-                up.props("flat round dense size=sm").tooltip("Move up")
-                down = ui.button(icon="arrow_downward", on_click=lambda i=i: move(i, 1))
-                down.props("flat round dense size=sm").tooltip("Move down")
-                ui.button(icon="close", on_click=lambda i=i: remove(i)).props(
-                    "flat round dense size=sm color=negative"
-                ).tooltip("Remove")
-                if i == 0:
-                    up.disable()
-                if i == last:
-                    down.disable()
-        focus_index[0] = None
+                ui.switch(
+                    "Hide from Santa (saved for the reveal)",
+                    value=section["hidden"],
+                    on_change=lambda e, s=section: s.__setitem__("hidden", e.value),
+                ).props("dense").classes("text-sm")
 
-        ui.button("Add question", icon="add", on_click=lambda: insert(len(questions))).props(
-            "flat dense"
-        )
+                questions = section["questions"]
+                for qi, text in enumerate(questions):
+                    number += 1
+                    with ui.row().classes("w-full items-center no-wrap gap-0"):
+                        box = (
+                            ui.input(
+                                placeholder=f"Question {number}",
+                                value=text,
+                                on_change=lambda e, q=questions, qi=qi: q.__setitem__(qi, e.value),
+                            )
+                            .props(f'outlined dense prefix="{number}."')
+                            .classes("grow")
+                            .on("keydown.enter", lambda si=si, qi=qi: add_question(si, qi + 1))
+                        )
+                        if focus[0] == (si, qi):
+                            box.props("autofocus")
+                        _move_remove_buttons(
+                            len(questions),
+                            qi,
+                            lambda step, si=si, qi=qi: move_question(si, qi, step),
+                            lambda si=si, qi=qi: remove_question(si, qi),
+                            "question",
+                        )
+                ui.button(
+                    "Add question",
+                    icon="add",
+                    on_click=lambda si=si, q=questions: add_question(si, len(q)),
+                ).props("flat dense")
+        focus[0] = None
+        ui.button("Add section", icon="playlist_add", on_click=add_section).props("outline dense")
 
     rows()
-    return lambda: [q.strip() for q in questions if q.strip()]
+    return lambda: [db.Section(s["title"], tuple(s["questions"]), s["hidden"]) for s in sections]
 
 
-def _question_list(questions: list[str]) -> None:
-    """Read-only numbered list of an event's locked questions."""
+def _move_remove_buttons(count: int, index: int, move, remove, what: str) -> None:
+    """↑ ↓ ✕ buttons for item `index` of `count`; `move` gets -1 or +1."""
+    up = ui.button(icon="arrow_upward", on_click=lambda: move(-1))
+    up.props("flat round dense size=sm").tooltip(f"Move {what} up")
+    down = ui.button(icon="arrow_downward", on_click=lambda: move(1))
+    down.props("flat round dense size=sm").tooltip(f"Move {what} down")
+    ui.button(icon="close", on_click=remove).props(
+        "flat round dense size=sm color=negative"
+    ).tooltip(f"Remove {what}")
+    if index == 0:
+        up.disable()
+    if index == count - 1:
+        down.disable()
+
+
+def _swap(items: list, i: int, j: int) -> None:
+    items[i], items[j] = items[j], items[i]
+
+
+def _question_list(sections: Sequence[db.Section]) -> None:
+    """Read-only view of an event's locked questions, by section."""
     ui.label("Clue questions").classes("font-medium")
-    if not questions:
+    if not sections:
         ui.label("None.").classes("text-sm text-gray-600")
-    for i, q in enumerate(questions, 1):
-        ui.label(f"{i}. {q}").classes("text-sm")
+    number = 0
+    for section in sections:
+        if section.title or section.hidden:
+            hidden = " 🤫 hidden from Santa" if section.hidden else ""
+            ui.label(f"{section.title or 'Untitled'}{hidden}").classes("text-sm font-semibold")
+        for q in section.questions:
+            number += 1
+            ui.label(f"{number}. {q}").classes("text-sm")
     ui.label("🔒 Questions are locked because people have joined.").classes("text-xs text-gray-500")
 
 

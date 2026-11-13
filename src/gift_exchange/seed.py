@@ -2,9 +2,10 @@
 
     uv run python -m gift_exchange.seed
 
-Creates event `xmas-2026` with 8 fake participants (emails @example.com) and one couple
-exclusion, left open (not matched) so the admin page can be tried. Does nothing if the
-event already exists. For development only — refuses to run unless DEV=1.
+Creates event `xmas-2026` (a visible and a hidden reveal-only question section) with 8
+fake participants (emails @example.com) and one couple exclusion, left open (not matched)
+so the admin page can be tried. Does nothing if the event already exists. For development
+only — refuses to run unless DEV=1.
 """
 
 import sys
@@ -15,22 +16,36 @@ from gift_exchange.config import load_settings
 from gift_exchange.core import db
 
 SLUG = "xmas-2026"
-QUESTIONS = [
-    "What do you do for fun?",
-    "Favourite colour?",
-    "Something you'd love but would never buy yourself?",
-    "Anything you dislike or are allergic to?",
+SECTIONS = [
+    db.Section(
+        "About you",
+        (
+            "What do you do for fun?",
+            "Favourite colour?",
+            "Something you'd love but would never buy yourself?",
+            "Anything you dislike or are allergic to?",
+        ),
+    ),
+    db.Section(
+        "For the reveal",
+        ("When your Santa hands you the gift, what should they say?",),
+        hidden=True,
+    ),
 ]
 PEOPLE = [
-    # (name, nickname, answers)
-    ("Alex Tan", "Rudolph", ["Bouldering", "Green", "A good chef's knife", "Nuts"]),
-    ("Bea Lim", "Snowflake", ["Baking", "Pink", "Fancy tea", "Nothing"]),
-    ("Chen Wei", "Tinsel", ["Board games", "Blue", "Noise-cancelling earbuds", "Scented things"]),
-    ("Dana Ng", "Comet", ["Running", "Orange", "Running socks", "Chocolate"]),
-    ("Eli Koh", "Pinecone", ["Photography", "Black", "Film rolls", "Mugs"]),
-    ("Fiona Goh", "Mistletoe", ["Gardening", "Yellow", "A bonsai kit", "Candles"]),
-    ("Gabe Ong", "Jingle", ["Gaming", "Purple", "A mechanical keyboard", "Clothes"]),
-    ("Hana Yeo", "Cocoa", ["Reading", "Red", "A Kindle cover", "Perfume"]),
+    # (name, nickname, answers: the 4 clues, then the hidden reveal prompt)
+    ("Alex Tan", "Rudolph", ["Bouldering", "Green", "A good chef's knife", "Nuts", "Ho ho ho!"]),
+    ("Bea Lim", "Snowflake", ["Baking", "Pink", "Fancy tea", "Nothing", "Surprise!"]),
+    (
+        "Chen Wei",
+        "Tinsel",
+        ["Board games", "Blue", "Noise-cancelling earbuds", "Scented things", "Merry Xmas"],
+    ),
+    ("Dana Ng", "Comet", ["Running", "Orange", "Running socks", "Chocolate", "Catch!"]),
+    ("Eli Koh", "Pinecone", ["Photography", "Black", "Film rolls", "Mugs", "Say cheese"]),
+    ("Fiona Goh", "Mistletoe", ["Gardening", "Yellow", "A bonsai kit", "Candles", "Grow up!"]),
+    ("Gabe Ong", "Jingle", ["Gaming", "Purple", "A mechanical keyboard", "Clothes", "GG"]),
+    ("Hana Yeo", "Cocoa", ["Reading", "Red", "A Kindle cover", "Perfume", "The end"]),
 ]
 COUPLE = ("Alex Tan", "Bea Lim")
 
@@ -50,7 +65,7 @@ def main() -> int:
         except db.NotFound:
             pass
 
-        event = db.create_event(conn, SLUG, "Christmas 2026 🎄", 30, QUESTIONS)
+        event = db.create_event(conn, SLUG, "Christmas 2026 🎄", 30, SECTIONS)
         try:
             ids = {}
             for name, nickname, answers in PEOPLE:

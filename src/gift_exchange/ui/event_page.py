@@ -105,16 +105,19 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
     )
 
     answers = []
-    for i, question in enumerate(event.questions):
-        answers.append(
-            ui.textarea(
-                question,
-                value=me.answers[i] if me else "",
-                validation={**required, "Too long": lambda v: len(v or "") <= MAX_ANSWER},
+    for section in event.sections:
+        _section_heading(section)
+        for question in section.questions:
+            i = len(answers)
+            answers.append(
+                ui.textarea(
+                    question,
+                    value=me.answers[i] if me else "",
+                    validation={**required, "Too long": lambda v: len(v or "") <= MAX_ANSWER},
+                )
+                .props("outlined autogrow")
+                .classes("w-full")
             )
-            .props("outlined autogrow")
-            .classes("w-full")
-        )
 
     def submit() -> None:
         fields = [name, nickname, *answers]
@@ -145,8 +148,10 @@ def _joined(event: db.Event, me: db.Participant) -> None:
     ui.label("The draw happens soon. You can edit your answers until then.")
     with ui.card().classes("w-full").props("flat bordered"):
         _qa("Nickname", me.nickname)
-        for question, answer in zip(event.questions, me.answers, strict=False):
-            _qa(question, answer)
+        for section, pairs in db.pair_answers(event.sections, me.answers):
+            _section_heading(section)
+            for question, answer in pairs:
+                _qa(question, answer)
     ui.button(
         "Edit my answers", on_click=lambda: ui.navigate.to(f"/e/{event.slug}?edit=true")
     ).props("outline").classes("w-full")
@@ -158,8 +163,11 @@ def _giftee(event: db.Event, giftee: db.Giftee) -> None:
     ui.label(f"Budget: S${giftee.budget}").classes("font-semibold")
     ui.label("What they told us:").classes("mt-2")
     with ui.card().classes("w-full").props("flat bordered"):
-        for question, answer in giftee.clues:
-            _qa(question, answer)
+        for title, pairs in giftee.clues:
+            if title:
+                ui.label(title).classes("font-semibold mt-1")
+            for question, answer in pairs:
+                _qa(question, answer)
     ui.label("🤫 Keep it secret until the party!").classes("text-center w-full mt-2")
 
 
@@ -177,6 +185,15 @@ def _header(event: db.Event, count: int) -> None:
         joined = f"{count} taking part"
     ui.label(f"Budget: S${event.budget} · {joined}").classes("text-gray-600 -mt-3")
     ui.separator()
+
+
+def _section_heading(section: db.Section) -> None:
+    if section.title:
+        ui.label(section.title).classes("font-semibold mt-2")
+    if section.hidden:
+        ui.label("🤫 Your Santa won't see these; they're saved for the party reveal.").classes(
+            "text-xs text-gray-500 -mt-3"
+        )
 
 
 def _qa(question: str, answer: str) -> None:

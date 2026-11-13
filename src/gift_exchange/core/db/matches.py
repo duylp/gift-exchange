@@ -12,7 +12,7 @@ from gift_exchange.core.db.connection import transaction
 from gift_exchange.core.db.errors import EventClosed
 from gift_exchange.core.db.events import get_event
 from gift_exchange.core.db.exclusions import list_exclusions
-from gift_exchange.core.db.models import Giftee
+from gift_exchange.core.db.models import Giftee, decode_sections, pair_answers
 from gift_exchange.core.db.signups import list_participants
 from gift_exchange.core.matching import Feasibility, check_feasibility, find_matching
 
@@ -74,7 +74,8 @@ def get_giftee(conn: sqlite3.Connection, event_id: int, email: str) -> Giftee | 
             giftee. Case and surrounding spaces are ignored.
 
     Returns:
-        The giftee's nickname, clues and the budget; or None if the event isn't matched
+        The giftee's nickname, clues (hidden reveal-only sections left out) and the
+        budget; or None if the event isn't matched
         yet or this email isn't in it.
     """
     row = conn.execute(
@@ -90,5 +91,6 @@ def get_giftee(conn: sqlite3.Connection, event_id: int, email: str) -> Giftee | 
     ).fetchone()
     if row is None:
         return None
-    clues = tuple(zip(json.loads(row["questions"]), json.loads(row["answers"]), strict=False))
+    groups = pair_answers(decode_sections(row["questions"]), json.loads(row["answers"]))
+    clues = tuple((section.title, pairs) for section, pairs in groups if not section.hidden)
     return Giftee(row["nickname"], clues, row["budget"])

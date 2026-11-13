@@ -30,7 +30,7 @@ from gift_exchange.core.db.events import (
 )
 from gift_exchange.core.db.exclusions import add_exclusion, list_exclusions, remove_exclusion
 from gift_exchange.core.db.matches import event_feasibility, get_giftee, run_matching
-from gift_exchange.core.db.models import Event, Giftee, Participant
+from gift_exchange.core.db.models import Event, Giftee, Participant, Section, pair_answers
 from gift_exchange.core.db.signups import (
     count_participants,
     get_participant,
@@ -51,6 +51,7 @@ __all__ = [
     "NotFound",
     "Participant",
     "QuestionsLocked",
+    "Section",
     "SlugTaken",
     "add_exclusion",
     "connect",
@@ -67,6 +68,7 @@ __all__ = [
     "list_events_joined_by",
     "list_exclusions",
     "list_participants",
+    "pair_answers",
     "remove_exclusion",
     "remove_participant",
     "run_matching",
