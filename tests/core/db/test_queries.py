@@ -1,4 +1,5 @@
 import random
+import re
 import sqlite3
 
 import pytest
@@ -249,17 +250,29 @@ def test_get_giftee_for_non_participant_is_none(conn: sqlite3.Connection, event:
     assert q.get_giftee(conn, event.id, "out@example.com") is None
 
 
+READS_MATCHES = re.compile(r"\b(from|join)\s+[\"`\[]?matches\b", re.IGNORECASE)
+
+
 def test_only_get_giftee_reads_matches() -> None:
-    # Secrecy guard: no query in the db package except get_giftee may read the matches table.
-    import re
+    # Secrecy guard: no Python code in the app except get_giftee may read the matches table.
+    # Scans every module under src/ as whole text (queries may span lines), ignoring case
+    # and identifier quotes, for FROM/JOIN matches.
     from pathlib import Path
 
-    readers = []
-    for path in sorted(Path(q.__file__).parent.glob("*.py")):
-        for line in path.read_text().splitlines():
-            if re.search(r"\b(FROM|JOIN)\s+matches\b", line):
-                readers.append((path.name, line.strip()))
-    assert readers == [("matches.py", "JOIN matches AS m ON m.giver_id = me.id")]
+    import gift_exchange
+
+    src = Path(gift_exchange.__file__).parent.parent
+    readers = [
+        (str(path.relative_to(src)), m.group(0))
+        for path in sorted(src.rglob("*.py"))
+        for m in READS_MATCHES.finditer(path.read_text())
+    ]
+    assert readers == [("gift_exchange/core/db/matches.py", "JOIN matches")]
+
+
+def test_secrecy_guard_catches_other_spellings() -> None:
+    for sql in ("select * from matches", "SELECT *\nFROM\n    matches", 'FROM "matches"'):
+        assert READS_MATCHES.search(sql), sql
 
 
 # --- review fixes -------------------------------------------------------------------
