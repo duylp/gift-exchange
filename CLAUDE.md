@@ -27,7 +27,11 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Budget:** one fixed amount per event, set by the organiser.
 - Sign-up: nickname + answers to the event's clue questions (answers stored as JSON).
 - **Admin page** (one plain page, admin only): create event (slug, title, budget); clue questions as a textarea, one per line (stored as JSON on the Event); participant list with remove; exclusions via two dropdowns + add; "Run matching" button that works only once per event.
-- Matching with rules: no self, no reciprocal pairs, exclusions (entered on the admin page); shuffle-until-valid with an attempt cap; random seed
+- **Matching** (`core/matching.py`): no self, no reciprocal pairs, two-way exclusions (entered on the admin page).
+  - Algorithm: shuffle-until-valid (rejection sampling) with an attempt cap — exactly uniform over valid assignments. Not greedy edge-picking (2021 approach: biased, dead-ends).
+  - Feasibility, checked up front and live on the admin page: anyone with < 2 allowed people → impossible (name them); everyone allowed with ≥ n/2 others → guaranteed (Dirac). Couples-only with n ≥ 4 is always guaranteed. Otherwise shuffle and report "probably impossible" if the cap is hit.
+  - Randomness: function takes an `rng`; tests pass a seeded one, production uses `random.SystemRandom`. No seed is stored or shown (it would reveal matches).
+  - Assignment splits into loops (A→B→C→A) for the chain-style reveal.
 - **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB — keep Match access behind one module so per-giver encryption can be added later.
 - "Your giftee" page: clues, budget
 - Stretch (only if v1 ships early): party reveal screen (big screen) with say-this/pose prompts: organiser clicks through pairs; guests submit guess-your-Santa guesses on their phones; scoring.
