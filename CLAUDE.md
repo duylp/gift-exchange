@@ -38,6 +38,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
   - Randomness: function takes an `rng`; tests pass a seeded one, production uses `random.SystemRandom`. No seed is stored or shown (it would reveal matches).
   - Assignment splits into loops (A→B→C→A) for the chain-style reveal.
 - **Match secrecy:** hidden from everyone in the app, organiser included (no screen shows them). Not encrypted in the DB. `core/db/matches.py:get_giftee` is the only function that reads `matches` (a test enforces it) and `run_matching` returns only a count — never add a query that lists matches.
+- **Layout:** every page builds inside `ui/layout.py:page_frame()`, which starts with a "🎁 Gift exchange" link back to `/`.
 - **Home page** `/` (`ui/pages.py`): logged out → welcome + login form; logged in → "Your exchanges" (events this email joined, via `db.list_events_joined_by`, with status and a link to each), plus **Manage events** for admins. Never lists events the person hasn't joined.
 - **Event page** `/e/<slug>` (`ui/event_page.py`): one page, state worked out from the DB on every load — not logged in (login form) / sign-up form / "you're in" with edit (`?edit=true`) / your giftee (nickname, clues, budget) / closed. Shows only a participant count publicly. After any change it navigates to itself (no UI-only state).
 - Stretch (only if v1 ships early): party reveal screen (big screen) with say-this/pose prompts: organiser clicks through pairs; guests submit guess-your-Santa guesses on their phones; scoring.

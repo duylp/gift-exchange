@@ -18,6 +18,7 @@ from gift_exchange.core.auth import (
     safe_next,
 )
 from gift_exchange.core.email import EmailError, EmailSender, login_email, make_sender
+from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.session import clear_session_cookie, current_email, set_session_cookie
 
 log = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def login_page(request: Request, next: str = "/", error: str = "") -> RedirectRe
     if current_email(request):
         return RedirectResponse(target, 303)
 
-    with ui.column().classes("w-full max-w-sm mx-auto mt-16 gap-4 p-4"):
+    with page_frame("max-w-sm"):
         ui.label("Log in 🎁").classes("text-2xl font-bold")
         if error in _LINK_ERRORS:
             ui.label(_LINK_ERRORS[error]).classes("text-red-700")

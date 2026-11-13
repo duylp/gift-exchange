@@ -5,6 +5,7 @@ from nicegui import ui
 
 from gift_exchange.core import db
 from gift_exchange.ui.dbconn import open_db
+from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.login import login_form
 from gift_exchange.ui.session import current_admin, current_email
 
@@ -13,8 +14,7 @@ from gift_exchange.ui.session import current_admin, current_email
 def index(request: Request) -> None:
     email = current_email(request)
     ui.page_title("Gift exchange")
-    with ui.column().classes("w-full max-w-md mx-auto gap-4 p-4 mt-6"):
-        ui.label("Gift exchange 🎁").classes("text-2xl font-bold")
+    with page_frame():
         if email is None:
             ui.label("Joining an exchange? Open the link from your group chat.")
             ui.label("Already joined? Log in to see your exchanges.").classes("-mt-2")

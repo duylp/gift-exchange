@@ -17,6 +17,7 @@ from gift_exchange.core import db
 from gift_exchange.core.auth import is_admin
 from gift_exchange.core.matching import MatchingError, Verdict
 from gift_exchange.ui.dbconn import open_db
+from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.login import login_url
 from gift_exchange.ui.session import current_email
 
@@ -43,7 +44,7 @@ def admin_home(request: Request) -> RedirectResponse | None:
         counts = {e.id: db.count_participants(conn, e.id) for e in events}
 
     ui.page_title("Admin")
-    with _frame():
+    with page_frame("max-w-xl"):
         ui.label("Your events").classes("text-2xl font-bold")
         if not events:
             ui.label("No events yet. Create one below.").classes("text-gray-600")
@@ -128,7 +129,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
             event = db.get_event_by_slug(conn, slug)
         except db.NotFound:
             ui.status_code(404)
-            with _frame():
+            with page_frame("max-w-xl"):
                 ui.label("No such event.")
                 ui.link("← All events", "/admin")
             return None
@@ -143,7 +144,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
         ui.navigate.to(here)
 
     ui.page_title(f"Admin · {event.title}")
-    with _frame():
+    with page_frame("max-w-xl"):
         ui.link("← All events", "/admin").classes("text-sm")
         with ui.row().classes("w-full items-center justify-between"):
             ui.label(event.title).classes("text-2xl font-bold")
@@ -371,10 +372,6 @@ async def _confirm(message: str, ok_label: str) -> bool:
     result = await dialog
     dialog.delete()
     return bool(result)
-
-
-def _frame() -> ui.column:
-    return ui.column().classes("w-full max-w-xl mx-auto gap-4 p-4 mt-4")
 
 
 def _section(title: str) -> None:

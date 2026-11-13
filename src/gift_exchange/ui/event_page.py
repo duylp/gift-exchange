@@ -14,6 +14,7 @@ from nicegui import ui
 
 from gift_exchange.core import db
 from gift_exchange.ui.dbconn import open_db
+from gift_exchange.ui.layout import page_frame
 from gift_exchange.ui.login import login_form
 from gift_exchange.ui.session import current_email
 
@@ -29,7 +30,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
             event = db.get_event_by_slug(conn, slug)
         except db.NotFound:
             ui.status_code(404)
-            with _frame():
+            with page_frame():
                 ui.label("No such event 🤔").classes("text-xl font-semibold")
                 ui.label("Check the link you were sent.")
             return
@@ -38,7 +39,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
         giftee = db.get_giftee(conn, event.id, email) if email and not event.is_open else None
 
     ui.page_title(event.title)
-    with _frame():
+    with page_frame():
         _header(event, count)
         if email is None:
             _welcome(event)
@@ -159,10 +160,6 @@ def _closed() -> None:
 
 
 # --- layout helpers -------------------------------------------------------------------------
-
-
-def _frame() -> ui.column:
-    return ui.column().classes("w-full max-w-md mx-auto gap-4 p-4 mt-6")
 
 
 def _header(event: db.Event, count: int) -> None:
