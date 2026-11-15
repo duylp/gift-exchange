@@ -53,7 +53,7 @@ class ResendSender:
 
     Args:
         api_key: Resend API key (RESEND_API_KEY).
-        sender: The `from` address, e.g. "Santa <santa@mail.mangobello.dev>"; its domain must be
+        sender: The `from` address, e.g. "Secret Santa <santa@mail.mangobello.dev>"; its domain must be
             verified in Resend.
         timeout: Seconds to wait for Resend before giving up.
         transport: httpx transport override, for tests only.
