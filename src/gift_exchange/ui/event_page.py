@@ -106,15 +106,19 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         _section_heading(section)
         for question in section.questions:
             i = len(answers)
-            answers.append(
+            # The question goes in its own label above the box: a field label is cut off
+            # at one line, and questions are often longer.
+            ui.label(question).classes("w-full -mb-3 whitespace-pre-line")
+            box = (
                 ui.textarea(
-                    question,
                     value=me.answers[i] if me else "",
                     validation={**required, "Too long": lambda v: len(v or "") <= MAX_ANSWER},
                 )
-                .props("outlined autogrow")
+                .props("outlined autogrow dense")
                 .classes("w-full")
             )
+            box.props["aria-label"] = question  # set directly: questions may contain quotes
+            answers.append(box)
 
     def submit() -> None:
         fields = [name, nickname, *answers]

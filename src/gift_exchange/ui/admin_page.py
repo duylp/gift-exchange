@@ -481,15 +481,20 @@ def _question_editor(initial: Sequence[db.Section]) -> Callable[[], list[db.Sect
                 for qi, text in enumerate(questions):
                     number += 1
                     with ui.row().classes("w-full items-center no-wrap gap-0"):
+                        # A growing textarea so long questions wrap; Enter still adds the
+                        # next question (.prevent: no newline in the box).
                         box = (
-                            ui.input(
+                            ui.textarea(
                                 placeholder=f"Question {number}",
                                 value=text,
                                 on_change=lambda e, q=questions, qi=qi: q.__setitem__(qi, e.value),
                             )
-                            .props(f'outlined dense prefix="{number}."')
+                            .props(f'outlined dense autogrow rows=1 prefix="{number}."')
                             .classes("grow")
-                            .on("keydown.enter", lambda si=si, qi=qi: add_question(si, qi + 1))
+                            .on(
+                                "keydown.enter.prevent",
+                                lambda si=si, qi=qi: add_question(si, qi + 1),
+                            )
                         )
                         if focus[0] == (si, qi):
                             box.props("autofocus")
