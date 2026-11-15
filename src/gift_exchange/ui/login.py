@@ -105,7 +105,11 @@ def login_form(next_path: str) -> None:
 
     with form:
         ui.label("Enter your email and we'll send you a login link. No password needed.")
-        email_input = ui.input("Email").props("type=email autofocus outlined").classes("w-full")
+        email_input = (
+            ui.input("Email")
+            .props("type=email autocomplete=email autofocus outlined")
+            .classes("w-full")
+        )
         button = ui.button("Send me a link").classes("w-full")
 
     async def submit() -> None:

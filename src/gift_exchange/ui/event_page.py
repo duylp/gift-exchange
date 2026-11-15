@@ -90,6 +90,8 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         .classes("w-full")
     )
     name.props["hint"] = "Only the organiser sees this (and everyone at the reveal)."
+    # Tell the browser what each field is, so it doesn't offer unrelated saved form data.
+    name.props["autocomplete"] = "name"
     nickname = (
         ui.input(
             "Nickname",
@@ -100,6 +102,7 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
         .classes("w-full")
     )
     nickname.props["hint"] = "Your Santa sees this instead of your name. Keep it a mystery! 🕵️"
+    nickname.props["autocomplete"] = "off"
 
     answers = []
     for section in event.sections:
@@ -118,6 +121,7 @@ def _signup_form(event: db.Event, email: str, me: db.Participant | None) -> None
                 .classes("w-full")
             )
             box.props["aria-label"] = question  # set directly: questions may contain quotes
+            box.props["autocomplete"] = "off"
             answers.append(box)
 
     def submit() -> None:
