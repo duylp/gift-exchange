@@ -11,7 +11,7 @@ def login_email(to: str, link: str) -> Email:
 
     Args:
         to: Recipient address.
-        link: Full login URL, e.g. "https://santa.duylp.dev/auth?token=…&next=/e/xmas-2026".
+        link: Full login URL, e.g. "https://santa.mangobello.dev/auth?token=…&next=/e/xmas-2026".
     """
     minutes = LOGIN_LINK_MAX_AGE // 60
     text = (

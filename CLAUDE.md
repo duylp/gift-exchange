@@ -10,7 +10,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Stack:** NiceGUI (pin exact version) + SQLite via stdlib `sqlite3` + magic-link login (itsdangerous) + Resend for email. Python 3.12, managed with uv.
 - **NiceGUI caution:** its API changes between major versions — check the official docs (https://nicegui.io/documentation) for the pinned version before writing UI code. Keep core logic (matching, DB, auth) in plain Python, separate from the UI layer. Keep all state in the DB, not in UI elements (phones drop WebSocket connections).
 - **Hosting:** DigitalOcean 1 GB Droplet in SGP1, Docker Compose + Caddy for HTTPS. For now, build the image on the Droplet (`docker compose up --build`); no CI pipeline yet. Deferred: GitHub Actions → GHCR, and arm64 images (only when a Raspberry Pi is actually used).
-- **Domain:** `duylp.dev` (to be registered); app at `santa.duylp.dev`, events at `/e/<slug>` (e.g. `xmas-2026`). Resend sending domain `mail.duylp.dev`.
+- **Domain:** `mangobello.dev` (registered on Cloudflare); app at `santa.mangobello.dev`, events at `/e/<slug>` (e.g. `xmas-2026`). Resend sending domain `mail.mangobello.dev`.
 - **DNS / registrar:** Cloudflare (registrar + DNS). App record is DNS-only (proxy off) so Caddy terminates TLS.
 - **Repo:** public on GitHub. Secrets never committed.
 - **Config:** `.env` (gitignored) holds only deployment settings and secrets — admin email, secret key, Resend key/sender, base URL, DB path. Outside `DEV=1`, `RESEND_API_KEY`, `EMAIL_FROM` and an `https://` `BASE_URL` are required (startup fails otherwise). Everything about an event lives in the DB and is managed via the admin page.
