@@ -1,0 +1,6 @@
+# HTTPS in front of the app. Caddy gets and renews the certificate itself.
+# SITE_ADDRESS is set in docker-compose.yml (santa.mangobello.dev; "localhost" for a local test).
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy app:8080
+}
