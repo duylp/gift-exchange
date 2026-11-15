@@ -253,7 +253,9 @@ def _people_list(event: db.Event, people: list[db.Participant], reload) -> None:
 
                 async def remove(p: db.Participant = person) -> None:
                     if not await _confirm(
-                        f"Remove {p.name}? Their sign-up and exclusions are deleted.", "Remove"
+                        f"Remove {p.name}? Their sign-up and exclusions are deleted.",
+                        "Remove",
+                        danger=True,
                     ):
                         return
                     try:
@@ -384,6 +386,7 @@ def _delete_button(event: db.Event) -> None:
             f"Delete “{event.title}”? Its page and sign-ups disappear from the app "
             "(they're kept in the database and can be restored there).",
             "Delete",
+            danger=True,
         ):
             return
         try:
@@ -547,13 +550,21 @@ def _question_list(sections: Sequence[db.Section]) -> None:
 # --- helpers ---------------------------------------------------------------------------------
 
 
-async def _confirm(message: str, ok_label: str) -> bool:
-    """Ask yes/no in a dialog (documented ui.dialog submit pattern)."""
+async def _confirm(message: str, ok_label: str, danger: bool = False) -> bool:
+    """Ask yes/no in a dialog (documented ui.dialog submit pattern).
+
+    Args:
+        message: The question.
+        ok_label: Text of the confirm button.
+        danger: Show the confirm button in red (removing or deleting something).
+    """
     with ui.dialog() as dialog, ui.card():
         ui.label(message)
         with ui.row().classes("w-full justify-end"):
             ui.button("Cancel", on_click=lambda: dialog.submit(False)).props("flat")
-            ui.button(ok_label, on_click=lambda: dialog.submit(True))
+            ok = ui.button(ok_label, on_click=lambda: dialog.submit(True))
+            if danger:
+                ok.props("color=negative")
     result = await dialog
     dialog.delete()
     return bool(result)

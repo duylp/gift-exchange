@@ -46,7 +46,9 @@ _FALLING = [
 ]
 
 _SNOW_CSS = """
-.theme-snow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+/* z-index -1: behind the page and also behind dialog backdrops (Quasar's sits at -1, later
+   in the DOM), so a dimmed page dims the snow too. */
+.theme-snow { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: -1; }
 .theme-snow > * {
     position: absolute; top: -8rem; line-height: 1;
     animation: theme-fall linear infinite; --tilt: 0deg; --spin: 180deg;
