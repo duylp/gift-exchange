@@ -10,3 +10,4 @@ data/
 .nicegui/
 .env.*
 !.env.example
+TODO.md

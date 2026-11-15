@@ -66,4 +66,4 @@ Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). T
 - All tables `STRICT`; timestamps UTC ISO-8601 text; budget whole S$.
 
 ## Task list
-`TODO.md` tracks tasks and progress only; it refers back here for facts. Record facts and decisions here, never duplicated in TODO.md. Tick items off as they are done.
+`TODO.md` (local only, gitignored) tracks tasks and progress only; it refers back here for facts. Record facts and decisions here, never duplicated in TODO.md. Tick items off as they are done.
