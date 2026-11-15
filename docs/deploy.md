@@ -13,6 +13,10 @@ used because Docker bypasses it). The app's port 8080 is reachable only by Caddy
 ## Server setup (done once, already done for the current Droplet)
 
 - Droplet: Docker on Ubuntu, 1 GB, SGP1. SSH host alias `root.droplet1` in the laptop's `~/.ssh/config`.
+- **Runs as root, no separate user** (decided 2026-11): a deploy user would need the `docker`
+  group, which is root-equivalent, so it adds little on a single-purpose box. SSH is key-only.
+  The app lives in `/opt/gift-exchange` (not a home folder), so adding a user later changes
+  nothing about the deployment. Cloned over HTTPS (public repo): no keys on the server.
 - 2 GB swap (`/swapfile`, `vm.swappiness=10`) so image builds don't run out of memory.
 - Docker log cap in `/etc/docker/daemon.json`: 3 × 10 MB per container.
 - Cloudflare: `A santa → <Droplet IP>`, **DNS only** (Caddy needs the real IP for HTTPS).
@@ -21,19 +25,19 @@ used because Docker bypasses it). The app's port 8080 is reachable only by Caddy
 
 ```sh
 ssh root.droplet1
-git clone https://github.com/<owner>/gift-exchange.git ~/gift-exchange
+git clone https://github.com/duylp/gift-exchange.git /opt/gift-exchange
 ```
 
 From the laptop, copy the production settings (never committed) to the Droplet as `.env`:
 
 ```sh
-scp .env.production root.droplet1:~/gift-exchange/.env
+scp .env.production root.droplet1:/opt/gift-exchange/.env
 ```
 
 On the Droplet:
 
 ```sh
-cd ~/gift-exchange
+cd /opt/gift-exchange
 chmod 600 .env
 docker compose up -d --build
 docker compose logs -f        # wait for "Applied migrations" and Caddy's "certificate obtained"
@@ -48,13 +52,13 @@ needs the secrets and `DEV=0`, `BASE_URL`, `ADMIN_EMAILS`, `EMAIL_FROM`.
 
 ```sh
 ssh root.droplet1
-cd ~/gift-exchange && git pull && docker compose up -d --build
+cd /opt/gift-exchange && git pull && docker compose up -d --build
 ```
 
 Migrations run automatically at startup, after a snapshot (see `docs/migrations.md`). Only
 the app restarts; logged-in people stay logged in (the session is a signed cookie).
 
-## Everyday commands (on the Droplet, in `~/gift-exchange`)
+## Everyday commands (on the Droplet, in `/opt/gift-exchange`)
 
 | What | Command |
 |---|---|
@@ -76,7 +80,7 @@ docker compose exec app python -c "import sqlite3; sqlite3.connect('data/gift.db
 docker compose cp app:/app/data/backup.db ./backup.db
 ```
 
-Then on the laptop: `scp root.droplet1:~/gift-exchange/backup.db data/gift-$(date +%F).db`.
+Then on the laptop: `scp root.droplet1:/opt/gift-exchange/backup.db data/gift-$(date +%F).db`.
 SQLite's backup API gives a consistent copy even while the app is running.
 
 ### Restore
