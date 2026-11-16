@@ -247,7 +247,9 @@ def _people_list(event: db.Event, people: list[db.Participant], reload) -> None:
     for person in people:
         with ui.row().classes("w-full items-center justify-between no-wrap"):
             with ui.column().classes("gap-0 min-w-0"):
-                ui.label(f"{person.name} · “{person.nickname}”").classes("font-medium")
+                # Never show nicknames here: the admin may be a participant, and nickname →
+                # name would tell them who their giftee is (a test enforces this).
+                ui.label(person.name).classes("font-medium")
                 ui.label(person.email).classes("text-xs text-gray-500 break-all")
             if event.is_open:
 
@@ -296,7 +298,9 @@ def _exclusions(
 
     if not event.is_open or len(people) < 2:
         return
-    options = {p.id: f"{p.name} ({p.nickname})" for p in people}
+    # Names only (no nicknames, see _people_list); the email tells apart people who share a name.
+    shared = {p.name for p in people if sum(q.name == p.name for q in people) > 1}
+    options = {p.id: f"{p.name} ({p.email})" if p.name in shared else p.name for p in people}
     with ui.row().classes("w-full items-center gap-2 no-wrap"):
         first = ui.select(options, label="Person", with_input=True).classes("grow")
         second = ui.select(options, label="Person", with_input=True).classes("grow")
