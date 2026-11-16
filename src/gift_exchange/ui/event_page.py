@@ -21,8 +21,13 @@ from gift_exchange.ui.session import current_email
 MAX_NAME = 80
 MAX_ANSWER = 500
 
+# How long the server keeps a page whose browser disconnected. Phones drop the connection
+# as soon as someone switches apps (e.g. to look up an answer); after this timeout NiceGUI
+# reloads the page and unsaved form input is lost. The default is 3 s.
+RECONNECT_TIMEOUT = 600
 
-@ui.page("/e/{slug}")
+
+@ui.page("/e/{slug}", reconnect_timeout=RECONNECT_TIMEOUT)
 def event_page(slug: str, request: Request, edit: bool = False) -> None:
     """One event's page; what it shows depends on the viewer (see the module docstring).
 
