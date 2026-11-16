@@ -57,6 +57,7 @@ Keep things as simple as possible to ship core features fast. Prefer the plaines
 - **Run:** `cp .env.example .env` (set `SECRET_KEY`), then `uv run python -m gift_exchange.main` — auto-reloads when `DEV=1`. Sample data: `uv run python -m gift_exchange.seed` (DEV only; event `xmas-2026`, 8 fake people, a hidden reveal section). Same command in Docker. No console-script entry point (breaks NiceGUI reload). Docker is for deployment only.
 - **Check before commit:** `uv run ruff format . && uv run ruff check . && uv run pytest`
 - **Git:** commit straight to `main`; small commits, at least one per finished TODO step.
+  Messages follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<optional scope>): <description>`, e.g. `fix(ui): keep the sign-up form when a phone switches apps`. Types: `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `style`, `build`, `ci`, `chore`. Scopes (optional): `ui`, `db`, `matching`, `auth`, `email`, `migrate`, `deploy`. Breaking changes: `!` after the type/scope and a `BREAKING CHANGE:` footer. Commits before 2026-11-16 don't follow it.
 
 ## Data model
 Schema: `src/gift_exchange/core/db/migrations/` (start at `0001_initial.sql`). Tables: events, participants, exclusions, matches (no users table — see **Identity**). Later features add their own tables by migration (messages, guesses).
