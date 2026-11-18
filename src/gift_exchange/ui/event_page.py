@@ -208,7 +208,7 @@ def _guess(
     with ui.card().classes("w-full mt-2").props("flat bordered"):
         ui.label(f"🕵️ Who is {giftee.nickname} really?").classes("text-lg font-semibold")
         if not event.guessing_open:
-            guess = names.get(my_guess) if my_guess is not None else None
+            guess = names.get(my_guess)
             ui.label(f"Your guess: {guess} 🔒" if guess else "You didn't guess. 🔒")
             ui.label("Guessing is closed. Find out at the reveal!").classes(
                 "text-sm text-gray-500 -mt-3"

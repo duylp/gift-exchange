@@ -97,7 +97,15 @@ def save_guess(conn: sqlite3.Connection, event_id: int, email: str, guessed_id: 
 
 
 def count_guesses(conn: sqlite3.Connection, event_id: int) -> int:
-    """How many Santas have guessed (organiser view: just a number, never the guesses)."""
+    """How many Santas have guessed (organiser view: just a number, never the guesses).
+
+    Args:
+        conn: Database connection.
+        event_id: The event.
+
+    Returns:
+        The number of participants with a saved guess (0 before matching).
+    """
     return conn.execute("SELECT COUNT(*) FROM guesses WHERE event_id = ?", (event_id,)).fetchone()[
         0
     ]
