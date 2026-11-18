@@ -1,5 +1,6 @@
 """Shared page layout: a centred column with a link home at the top, styled by a theme."""
 
+import json
 import random
 
 from nicegui import ui
@@ -151,3 +152,38 @@ def account_footer(email: str) -> None:
     with ui.row().classes("w-full justify-between text-sm text-gray-500"):
         ui.label(f"Logged in as {email}")
         ui.link("Log out", "/logout")
+
+
+def local_date_label(template: str, utc_iso: str | None) -> ui.label:
+    """A label with a date in the viewer's own time zone and date format.
+
+    Timestamps are stored in UTC, but a date cut from them can be a day off for the
+    viewer (07:30 in Singapore is 23:30 the day before in UTC). The label first shows the
+    UTC date; once the browser connects, it asks the device to format the date and puts
+    that in the label's text (server-side, so a page redraw keeps it).
+
+    Args:
+        template: The label text, with `{date}` where the date goes.
+        utc_iso: UTC ISO-8601 timestamp, e.g. `events.matched_at`. None or "" shows "".
+
+    Returns:
+        The label.
+    """
+    label = ui.label(template.format(date=(utc_iso or "")[:10]))
+    if not utc_iso:
+        return label
+
+    async def localise() -> None:
+        js = (
+            f"return new Date({json.dumps(utc_iso)}).toLocaleDateString(undefined, "
+            "{day: 'numeric', month: 'short', year: 'numeric'})"
+        )
+        try:
+            date = await ui.run_javascript(js)
+        except TimeoutError:
+            return  # keep the UTC date
+        if isinstance(date, str) and date:
+            label.set_text(template.format(date=date))
+
+    ui.timer(0, localise, once=True)
+    return label

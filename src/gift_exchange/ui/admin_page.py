@@ -17,7 +17,7 @@ from gift_exchange.config import get_settings
 from gift_exchange.core import db
 from gift_exchange.core.matching import MatchingError, Verdict
 from gift_exchange.ui.dbconn import open_db
-from gift_exchange.ui.layout import page_frame
+from gift_exchange.ui.layout import local_date_label, page_frame
 from gift_exchange.ui.login import login_url
 from gift_exchange.ui.session import current_admin, current_email
 from gift_exchange.ui.themes import theme_options
@@ -148,7 +148,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
         people = db.list_participants(conn, event.id)
         exclusions = db.list_exclusions(conn, event.id)
         feasibility = db.event_feasibility(conn, event.id)
-        guesses = db.count_guesses(conn, event.id)
+        guesses = 0 if event.is_open else db.count_guesses(conn, event.id)
 
     names = {p.id: p.name for p in people}
     here = f"/admin/e/{event.slug}"
@@ -355,8 +355,10 @@ def _draw(
     reload,
 ) -> None:
     if not event.is_open:
-        when = (event.matched_at or "")[:10]
-        ui.label(f"✓ Matched on {when}. Everyone can see their giftee at the event link.")
+        local_date_label(
+            "✓ Matched on {date}. Everyone can see their giftee at the event link.",
+            event.matched_at,
+        )
         ui.label("Who got whom is secret, even from you. 🤫").classes("text-sm text-gray-500")
         return
 
@@ -396,8 +398,9 @@ def _guesses(event: db.Event, guessed: int, people: int, reload) -> None:
     """
     ui.label(f"{guessed} of {people} have guessed who their giftee is.")
     if not event.guessing_open:
-        when = (event.guesses_closed_at or "")[:10]
-        ui.label(f"🔒 Guessing closed on {when}.").classes("text-sm text-gray-500")
+        local_date_label("🔒 Guessing closed on {date}.", event.guesses_closed_at).classes(
+            "text-sm text-gray-500"
+        )
         return
 
     async def close() -> None:
