@@ -40,6 +40,8 @@ class Event:
         status: "open" (sign-ups open) or "matched" (final).
         matched_at: UTC ISO-8601 time matching ran, or None.
         theme: Look of the event page, one of `THEMES`.
+        guesses_closed_at: UTC ISO-8601 time the organiser closed giftee guessing, or
+            None while it's open (or before matching).
     """
 
     id: int
@@ -50,10 +52,16 @@ class Event:
     status: str
     matched_at: str | None
     theme: str = DEFAULT_THEME
+    guesses_closed_at: str | None = None
 
     @property
     def is_open(self) -> bool:
         return self.status == "open"
+
+    @property
+    def guessing_open(self) -> bool:
+        """True if Santas can guess their giftee now: matched, and not closed yet."""
+        return self.status == "matched" and self.guesses_closed_at is None
 
     @property
     def questions(self) -> tuple[str, ...]:
@@ -98,6 +106,19 @@ class Giftee:
     budget: int
 
 
+@dataclass(frozen=True)
+class GuessOption:
+    """A person a Santa can pick when guessing who their giftee really is.
+
+    Attributes:
+        id: The participant's row ID (what a guess stores).
+        name: Their real name.
+    """
+
+    id: int
+    name: str
+
+
 PARTICIPANT_SELECT = """
     SELECT p.id, p.event_id, p.email, p.name, p.nickname, p.answers FROM participants AS p
 """
@@ -113,6 +134,7 @@ def event_from_row(row: sqlite3.Row) -> Event:
         status=row["status"],
         matched_at=row["matched_at"],
         theme=row["theme"],
+        guesses_closed_at=row["guesses_closed_at"],
     )
 
 

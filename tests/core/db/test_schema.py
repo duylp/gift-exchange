@@ -181,3 +181,63 @@ def test_deleted_event_cannot_be_matched(db: sqlite3.Connection) -> None:
     db.execute("UPDATE events SET deleted_at = 'now' WHERE id = ?", (event,))
     with pytest.raises(sqlite3.IntegrityError, match="cannot be matched"):
         db.execute("UPDATE events SET status = 'matched' WHERE id = ?", (event,))
+
+
+# --- schema constraints (0002_guesses) ---------------------------------------------
+
+
+def guess(db: sqlite3.Connection, event: int, guesser: int, guessed: int) -> None:
+    db.execute(
+        "INSERT INTO guesses (event_id, guesser_id, guessed_id) VALUES (?, ?, ?) "
+        "ON CONFLICT (guesser_id) DO UPDATE SET guessed_id = excluded.guessed_id",
+        (event, guesser, guessed),
+    )
+
+
+def test_no_guess_before_matching(db: sqlite3.Connection) -> None:
+    event, (a, b, _) = setup_three(db)
+    with pytest.raises(sqlite3.IntegrityError, match="not open"):
+        guess(db, event, a, b)
+
+
+def test_guess_after_matching_and_change(db: sqlite3.Connection) -> None:
+    event, people = setup_three(db)
+    a, b, c = people
+    match(db, event, people)
+    guess(db, event, a, b)
+    guess(db, event, a, c)  # change of mind overwrites
+    rows = db.execute("SELECT guesser_id, guessed_id FROM guesses").fetchall()
+    assert [tuple(r) for r in rows] == [(a, c)]
+
+
+def test_guess_not_self_and_same_event(db: sqlite3.Connection) -> None:
+    event, people = setup_three(db)
+    match(db, event, people)
+    other = add_event(db, "other")
+    outsider = join(db, other, "out@x.com", "out")
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        guess(db, event, people[0], people[0])
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        guess(db, event, people[0], outsider)
+
+
+def test_guesses_frozen_once_closed(db: sqlite3.Connection) -> None:
+    event, people = setup_three(db)
+    a, b, c = people
+    match(db, event, people)
+    guess(db, event, a, b)
+    db.execute("UPDATE events SET guesses_closed_at = 'now' WHERE id = ?", (event,))
+    with pytest.raises(sqlite3.IntegrityError, match="not open"):
+        guess(db, event, a, c)  # change
+    with pytest.raises(sqlite3.IntegrityError, match="not open"):
+        guess(db, event, b, c)  # new
+    with pytest.raises(sqlite3.IntegrityError, match="closed"):
+        db.execute("DELETE FROM guesses")
+    with pytest.raises(sqlite3.IntegrityError, match="for good"):
+        db.execute("UPDATE events SET guesses_closed_at = NULL WHERE id = ?", (event,))
+
+
+def test_guessing_closes_only_after_matching(db: sqlite3.Connection) -> None:
+    event, _ = setup_three(db)
+    with pytest.raises(sqlite3.IntegrityError, match="after matching"):
+        db.execute("UPDATE events SET guesses_closed_at = 'now' WHERE id = ?", (event,))

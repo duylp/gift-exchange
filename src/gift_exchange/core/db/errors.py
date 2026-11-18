@@ -32,3 +32,8 @@ class QuestionsChanged(DbError):
 
 class QuestionsLocked(DbError):
     """The event's questions can't change because someone has already signed up."""
+
+
+class GuessingClosed(DbError):
+    """Giftee guesses can't be made or changed: the event isn't matched yet, or the
+    organiser has closed guessing."""

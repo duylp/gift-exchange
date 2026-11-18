@@ -422,3 +422,88 @@ def test_pair_answers_splits_by_section() -> None:
         (sections[0], (("1?", "x"), ("2?", "y"))),
         (sections[1], (("3?", "z"),)),
     ]
+
+
+# --- giftee guesses -------------------------------------------------------------------
+
+
+@pytest.fixture
+def matched(conn: sqlite3.Connection, event: q.Event) -> list[q.Participant]:
+    people = [signup(conn, event, n) for n in ("dan", "ann", "cat", "bob")]
+    q.run_matching(conn, event.id, random.Random(1))
+    return people
+
+
+def test_guess_options_are_everyone_else_by_name(
+    conn: sqlite3.Connection, event: q.Event, matched: list[q.Participant]
+) -> None:
+    dan = matched[0]
+    options = q.guess_options(conn, event.id, " DAN@example.com ")
+    assert [o.name for o in options] == ["Ann", "Bob", "Cat"]
+    assert dan.id not in {o.id for o in options}
+    with pytest.raises(q.NotFound):
+        q.guess_options(conn, event.id, "out@example.com")
+
+
+def test_save_and_change_guess(
+    conn: sqlite3.Connection, event: q.Event, matched: list[q.Participant]
+) -> None:
+    dan, ann, cat, _ = matched
+    assert q.get_my_guess(conn, event.id, dan.email) is None
+    q.save_guess(conn, event.id, dan.email, ann.id)
+    q.save_guess(conn, event.id, "Dan@Example.com", cat.id)
+    assert q.get_my_guess(conn, event.id, dan.email) == cat.id
+    assert q.get_my_guess(conn, event.id, ann.email) is None
+    assert q.count_guesses(conn, event.id) == 1
+
+
+def test_any_other_participant_is_accepted(
+    conn: sqlite3.Connection, event: q.Event, matched: list[q.Participant]
+) -> None:
+    # Secrecy: saving never depends on the matches, so it can't be used to probe them.
+    # Every guesser can save every other participant, right or wrong, without error.
+    for guesser in matched:
+        for other in matched:
+            if other.id != guesser.id:
+                q.save_guess(conn, event.id, guesser.email, other.id)
+                assert q.get_my_guess(conn, event.id, guesser.email) == other.id
+
+
+def test_bad_guesses(
+    conn: sqlite3.Connection, event: q.Event, matched: list[q.Participant]
+) -> None:
+    dan = matched[0]
+    other = q.create_event(conn, "other", "Other", 10, QUESTIONS)
+    outsider = signup(conn, other, "eve")
+    with pytest.raises(ValueError):
+        q.save_guess(conn, event.id, dan.email, dan.id)
+    with pytest.raises(q.NotFound):
+        q.save_guess(conn, event.id, dan.email, outsider.id)
+    with pytest.raises(q.NotFound):
+        q.save_guess(conn, event.id, "out@example.com", dan.id)
+    assert q.count_guesses(conn, event.id) == 0
+
+
+def test_no_guessing_before_matching(conn: sqlite3.Connection, event: q.Event) -> None:
+    a, b = signup(conn, event, "ann"), signup(conn, event, "bob")
+    with pytest.raises(q.GuessingClosed, match="after the draw"):
+        q.save_guess(conn, event.id, a.email, b.id)
+    with pytest.raises(q.GuessingClosed):
+        q.close_guessing(conn, event.id)
+    assert not q.get_event(conn, event.id).guessing_open
+
+
+def test_close_guessing(
+    conn: sqlite3.Connection, event: q.Event, matched: list[q.Participant]
+) -> None:
+    dan, ann, cat, _ = matched
+    assert q.get_event(conn, event.id).guessing_open
+    q.save_guess(conn, event.id, dan.email, ann.id)
+    closed = q.close_guessing(conn, event.id)
+    assert not closed.guessing_open and closed.guesses_closed_at
+    with pytest.raises(q.GuessingClosed, match="closed"):
+        q.save_guess(conn, event.id, dan.email, cat.id)
+    with pytest.raises(q.GuessingClosed):
+        q.close_guessing(conn, event.id)
+    assert q.get_my_guess(conn, event.id, dan.email) == ann.id
+    assert not conn.in_transaction

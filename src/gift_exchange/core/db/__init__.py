@@ -4,7 +4,7 @@ All SQL lives in this package; the UI calls these functions. Import the package 
 its names (`from gift_exchange.core import db; db.join_event(...)`).
 
 Modules: `connection` (connect, transactions, migrations folder), `errors`, `models`,
-`events`, `signups`, `exclusions`, `matches`. The schema is in `migrations/`.
+`events`, `signups`, `exclusions`, `matches`, `guesses`. The schema is in `migrations/`.
 
 Match secrecy: `matches.get_giftee` is the only function that reads the `matches` table.
 """
@@ -14,6 +14,7 @@ from gift_exchange.core.db.errors import (
     AlreadyJoined,
     DbError,
     EventClosed,
+    GuessingClosed,
     NicknameTaken,
     NotFound,
     QuestionsChanged,
@@ -30,12 +31,20 @@ from gift_exchange.core.db.events import (
     update_event,
 )
 from gift_exchange.core.db.exclusions import add_exclusion, list_exclusions, remove_exclusion
+from gift_exchange.core.db.guesses import (
+    close_guessing,
+    count_guesses,
+    get_my_guess,
+    guess_options,
+    save_guess,
+)
 from gift_exchange.core.db.matches import event_feasibility, get_giftee, run_matching
 from gift_exchange.core.db.models import (
     DEFAULT_THEME,
     THEMES,
     Event,
     Giftee,
+    GuessOption,
     Participant,
     Section,
     pair_answers,
@@ -58,6 +67,8 @@ __all__ = [
     "Event",
     "EventClosed",
     "Giftee",
+    "GuessOption",
+    "GuessingClosed",
     "NicknameTaken",
     "NotFound",
     "Participant",
@@ -66,7 +77,9 @@ __all__ = [
     "Section",
     "SlugTaken",
     "add_exclusion",
+    "close_guessing",
     "connect",
+    "count_guesses",
     "count_participants",
     "create_event",
     "delete_event",
@@ -74,7 +87,9 @@ __all__ = [
     "get_event",
     "get_event_by_slug",
     "get_giftee",
+    "get_my_guess",
     "get_participant",
+    "guess_options",
     "join_event",
     "list_events",
     "list_events_joined_by",
@@ -84,6 +99,7 @@ __all__ = [
     "remove_exclusion",
     "remove_participant",
     "run_matching",
+    "save_guess",
     "transaction",
     "update_event",
     "update_signup",
