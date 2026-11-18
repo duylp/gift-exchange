@@ -4,7 +4,7 @@ States (worked out fresh from the database on every load):
   A. not logged in                → welcome + login form
   B. logged in, not joined, open  → sign-up form   (also C's "edit" mode: ?edit=1)
   C. joined, event open           → "you're in" + answers + edit button
-  D. joined, event matched        → your giftee
+  D. joined, event matched        → your giftee + guess who they really are
   E. not joined, event matched    → sign-ups closed
 After any change the page navigates to itself, so it always shows what the database says.
 """
@@ -49,6 +49,10 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
         count = db.count_participants(conn, event.id)
         me = _my_signup(conn, event.id, email)
         giftee = db.get_giftee(conn, event.id, email) if email and not event.is_open else None
+        options, my_guess = [], None
+        if giftee is not None:
+            options = db.guess_options(conn, event.id, email)
+            my_guess = db.get_my_guess(conn, event.id, email)
 
     ui.page_title(event.title)
     with page_frame(theme=event.theme):
@@ -62,6 +66,7 @@ def event_page(slug: str, request: Request, edit: bool = False) -> None:
             _joined(event, me)
         elif giftee is not None:
             _giftee(event, giftee)
+            _guess(event, email, giftee, options, my_guess)
         else:
             _closed()
         if email:
@@ -188,6 +193,56 @@ def _giftee(event: db.Event, giftee: db.Giftee) -> None:
     ui.label("🤫 Keep it secret until the party!").classes("text-center w-full mt-2")
 
 
+def _guess(
+    event: db.Event,
+    email: str,
+    giftee: db.Giftee,
+    options: list[db.GuessOption],
+    my_guess: int | None,
+) -> None:
+    """Guess which participant (real name) is behind the giftee's nickname.
+
+    Never says whether the guess is right: that's for the party reveal.
+    """
+    names = {o.id: o.name for o in options}
+    with ui.card().classes("w-full mt-2").props("flat bordered"):
+        ui.label(f"🕵️ Who is {giftee.nickname} really?").classes("text-lg font-semibold")
+        if not event.guessing_open:
+            guess = names.get(my_guess) if my_guess is not None else None
+            ui.label(f"Your guess: {guess} 🔒" if guess else "You didn't guess. 🔒")
+            ui.label("Guessing is closed. Find out at the reveal!").classes(
+                "text-sm text-gray-500 -mt-3"
+            )
+            return
+        ui.label(
+            "Guess from the clues. Only you see your guess, and you can change it until "
+            "the organiser closes guessing at the party."
+        ).classes("text-sm text-gray-600 -mt-3")
+        select = (
+            ui.select(names, label="Your guess", value=my_guess if my_guess in names else None)
+            .props("outlined")
+            .classes("w-full")
+        )
+
+        def save() -> None:
+            if select.value is None:
+                ui.notify("Pick someone first.", type="warning")
+                return
+            try:
+                with open_db() as conn:
+                    db.save_guess(conn, event.id, email, select.value)
+            except (db.DbError, ValueError) as exc:
+                ui.notify(str(exc), type="negative")
+                return
+            ui.navigate.to(f"/e/{event.slug}")
+
+        ui.button("Save guess" if my_guess is None else "Change guess", on_click=save).classes(
+            "w-full"
+        )
+        if my_guess in names:
+            ui.label(f"Saved: {names[my_guess]} ✓").classes("text-sm text-center w-full")
+
+
 def _closed() -> None:
     ui.label("Sign-ups are closed. The draw has already happened.").classes("text-lg")
 
@@ -220,8 +275,12 @@ def _how_it_works(event: db.Event) -> None:
         ),
         f"**Budget:** about **S${event.budget}**.",
         (
-            "**Keep it secret 🤫** At the party, gifts are handed over and everyone guesses who "
-            "their Santa was. Nobody can see who got whom, not even the organiser."
+            "**Guess 🕵️** Before the party, guess which of the others is your giftee. Only you "
+            "see your guess; it's revealed at the party."
+        ),
+        (
+            "**Keep it secret 🤫** Nobody can see who got whom, not even the organiser. All is "
+            "revealed at the party."
         ),
     ]
     if any(section.hidden for section in event.sections):

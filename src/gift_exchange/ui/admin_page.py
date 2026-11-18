@@ -148,6 +148,7 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
         people = db.list_participants(conn, event.id)
         exclusions = db.list_exclusions(conn, event.id)
         feasibility = db.event_feasibility(conn, event.id)
+        guesses = db.count_guesses(conn, event.id)
 
     names = {p.id: p.name for p in people}
     here = f"/admin/e/{event.slug}"
@@ -175,6 +176,10 @@ def admin_event(slug: str, request: Request) -> RedirectResponse | None:
 
         _section("Draw")
         _draw(event, len(people), len(exclusions), feasibility, names, reload)
+
+        if not event.is_open:
+            _section("Guesses")
+            _guesses(event, guesses, len(people), reload)
 
         if event.is_open:
             _section("Danger zone")
@@ -382,6 +387,37 @@ def _draw(
     if not can_run:
         button.disable()
         ui.label("Fix the problem above to enable the draw.").classes("text-xs text-gray-500 -mt-2")
+
+
+def _guesses(event: db.Event, guessed: int, people: int, reload) -> None:
+    """How many Santas have guessed their giftee, and the button to close guessing.
+
+    Only the count: never who guessed whom (the admin may be a participant too).
+    """
+    ui.label(f"{guessed} of {people} have guessed who their giftee is.")
+    if not event.guessing_open:
+        when = (event.guesses_closed_at or "")[:10]
+        ui.label(f"🔒 Guessing closed on {when}.").classes("text-sm text-gray-500")
+        return
+
+    async def close() -> None:
+        if not await _confirm(
+            f"Close guessing? {guessed} of {people} have guessed. Nobody can guess or "
+            "change their guess after this.",
+            "Close guesses",
+            danger=True,
+        ):
+            return
+        try:
+            with open_db() as conn:
+                db.close_guessing(conn, event.id)
+        except db.DbError as exc:
+            ui.notify(str(exc), type="negative")
+            return
+        reload()
+
+    ui.button("Close guesses", on_click=close).props("outline").classes("w-full")
+    ui.label("Do this at the party, just before the reveal.").classes("text-xs text-gray-500 -mt-2")
 
 
 def _delete_button(event: db.Event) -> None:
