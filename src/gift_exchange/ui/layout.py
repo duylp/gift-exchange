@@ -158,7 +158,7 @@ def local_date_label(template: str, utc_iso: str | None) -> ui.label:
     """A label with a date in the viewer's own time zone and date format.
 
     Timestamps are stored in UTC, but a date cut from them can be a day off for the
-    viewer (07:30 in Singapore is 23:30 the day before in UTC). The label first shows the
+    viewer (07:30 at UTC+8 is 23:30 the day before in UTC). The label first shows the
     UTC date; once the browser connects, it asks the device to format the date and puts
     that in the label's text (server-side, so a page redraw keeps it).
 
